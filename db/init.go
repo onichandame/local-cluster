@@ -1,8 +1,10 @@
 package db
 
 import (
+	"path/filepath"
+
+	"github.com/onichandame/local-cluster/config"
 	"github.com/onichandame/local-cluster/db/model"
-	"github.com/spf13/viper"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -10,9 +12,11 @@ import (
 var Db *gorm.DB
 
 func DBInit() {
-	dbPathKey := "database"
-	viper.SetDefault(dbPathKey, "cluster.sqlite")
-	dbPath := viper.GetString(dbPathKey)
+	dbDir, err := config.GetDbDir()
+	if err != nil {
+		panic("failed to load db path")
+	}
+	dbPath := filepath.Join(dbDir, "core.sqlite")
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		panic("failed to open core database")
@@ -26,5 +30,8 @@ func loadModels() {
 	Db.AutoMigrate(&model.User{})
 	Db.AutoMigrate(&model.Credential{})
 	Db.AutoMigrate(&model.JobRecord{})
-	Db.AutoMigrate(&model.JobStatus{})
+	Db.AutoMigrate(&model.Enum{})
+	Db.AutoMigrate(&model.Application{})
+	Db.AutoMigrate(&model.ApplicationSpec{})
+	Db.AutoMigrate(&model.Instance{})
 }

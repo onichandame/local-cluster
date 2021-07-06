@@ -10,10 +10,11 @@ import (
 )
 
 var createAdmin = job{
-	interval:  "1m",
-	name:      "CreateAdmin",
-	fatal:     true,
-	immediate: true,
+	interval:       "1m",
+	name:           "CreateAdmin",
+	fatal:          true,
+	immediate:      true,
+	successfulRuns: 1,
 	run: func() error {
 		var err error
 		admin := model.User{}
@@ -30,7 +31,7 @@ var createAdmin = job{
 					}
 					const keyAdminPass = "admin_password"
 					viper.SetDefault(keyAdminPass, "admin")
-					cred := model.Credential{UserID: admin.ID}
+					cred := model.Credential{UserID: admin.ID, Password: viper.GetString(keyAdminPass)}
 					err = db.Create(&cred).Error
 					if err != nil {
 						return err

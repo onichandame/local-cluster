@@ -3,6 +3,7 @@ package job
 import (
 	"errors"
 	"fmt"
+
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/sirupsen/logrus"
@@ -12,6 +13,30 @@ import (
 var errJobAlreadyRun = errors.New(fmt.Sprintf("job already created by another runner"))
 
 func runJob(job *job) {
+	if job.totalRuns != 0 {
+		runs, err := countRuns(struct {
+			job     string
+			success bool
+		}{job: job.name})
+		if err != nil {
+			logrus.Fatalf("failed to count job records for job %s", job.name)
+		}
+		if runs >= job.totalRuns {
+			return
+		}
+	}
+	if job.successfulRuns != 0 {
+		runs, err := countRuns(struct {
+			job     string
+			success bool
+		}{job: job.name, success: true})
+		if err != nil {
+			logrus.Fatalf("failed to count successful runs for job %s", job.name)
+		}
+		if runs >= job.successfulRuns {
+			return
+		}
+	}
 	prev := findLastRun(job)
 	runID, err := initiateRun(job, prev)
 	if err != nil {
@@ -45,9 +70,8 @@ func findLastRun(job *job) uint {
 }
 
 func initiateRun(job *job, prev uint) (uint, error) {
-	status := model.JobStatus{Status: model.PENDING}
-	db.Db.FirstOrCreate(&model.JobStatus{}, status)
-	run := model.JobRecord{Job: job.name, Status: model.JobStatus{Status: model.PENDING}, PrevID: prev}
+	statuses := model.GetJobStatuses(db.Db)
+	run := model.JobRecord{Job: job.name, StatusID: statuses[model.PENDING].ID, PrevID: prev}
 	err := db.Db.Create(&run).Error
 	if err != nil {
 		logrus.Error(err)
@@ -62,9 +86,13 @@ func initiateRun(job *job, prev uint) (uint, error) {
 	return run.ID, nil
 }
 
-func finalizeRun(runID uint, status model.Status) {
+func finalizeRun(runID uint, status model.EnumValue) {
+	allowedStatuses := map[model.EnumValue]interface{}{model.FINISHED: nil, model.FAILED: nil}
+	if _, ok := allowedStatuses[status]; !ok {
+		logrus.Fatalf("job record finalized with an unsupported status %s", status)
+	}
 	statuses := model.GetJobStatuses(db.Db)
-	db.Db.Model(&model.JobRecord{}).Where("id = ? and status_id = ?", runID, statuses[model.PENDING].ID).Update("status_id", statuses[status].ID)
+	db.Db.Model(&model.JobRecord{}).Where("id = ? AND status_id = ?", runID, statuses[model.PENDING].ID).Update("status_id", statuses[status].ID)
 
 	log := func() {
 		run := model.JobRecord{}
@@ -79,4 +107,18 @@ func finalizeRun(runID uint, status model.Status) {
 		}
 	}
 	go log()
+}
+
+func countRuns(args struct {
+	job     string
+	success bool
+}) (uint, error) {
+	var count int64
+	query := db.Db.Model(&model.JobRecord{}).Where("job = ?", args.job)
+	if args.success {
+		statuses := model.GetJobStatuses(db.Db)
+		query = query.Where("status_id = ?", statuses[model.FINISHED].ID)
+	}
+	err := query.Count(&count).Error
+	return uint(count), err
 }
