@@ -12,10 +12,7 @@ import (
 var Db *gorm.DB
 
 func DBInit() {
-	dbDir, err := config.GetDbDir()
-	if err != nil {
-		panic("failed to load db path")
-	}
+	dbDir := config.ConfigPresets.DbDir
 	dbPath := filepath.Join(dbDir, "core.sqlite")
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {

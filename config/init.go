@@ -7,17 +7,20 @@ import (
 )
 
 const (
-	configFilename = "local_config"
+	configFilename = "local_cluster"
 	envPrefix      = "lcluster"
 )
 
 func ConfigInit() {
+	if err := initPresets(); err != nil {
+		logrus.Fatalf("failed to init root directories")
+	}
 	viper.SetConfigName(configFilename)
 	systemConfigDir, err := os.UserConfigDir()
 	if err == nil {
 		viper.AddConfigPath(systemConfigDir)
 	}
-	viper.AddConfigPath(".")
+	viper.AddConfigPath(ConfigPresets.RootDir)
 	viper.SetEnvPrefix(envPrefix)
 	err = viper.ReadInConfig()
 	if err != nil {

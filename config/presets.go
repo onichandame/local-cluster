@@ -5,46 +5,26 @@ import (
 	"path/filepath"
 )
 
-const ROOT = "lcl"
+type presets struct {
+	RootDir  string
+	CacheDir string
+	DbDir    string
+	AppsDir  string
+}
 
-func GetRootPath() (string, error) {
+var ConfigPresets = presets{}
+
+func initPresets() error {
 	exePath, err := os.Executable()
 	if err != nil {
-		return "", err
+		return err
 	}
-	return filepath.Dir(exePath), nil
-}
-
-func GetCacheDir() (string, error) {
-	root, err := GetRootPath()
-	if err == nil {
-		root = filepath.Join(root, "cache")
-		os.Mkdir(root, os.ModeDir)
-	}
-	return root, nil
-}
-
-func GetDbDir() (string, error) {
-	root, err := GetRootPath()
-	if err == nil {
-		root = filepath.Join(root, "db")
-		os.Mkdir(root, os.ModeDir)
-	}
-	return root, err
-}
-
-func GetInstancesDir() (string, error) {
-	root, err := GetRootPath()
-	if err == nil {
-		root = filepath.Join(root, "instances")
-	}
-	return root, err
-}
-
-func GetAppsDir() (string, error) {
-	root, err := GetRootPath()
-	if err == nil {
-		root = filepath.Join(root, "apps")
-	}
-	return root, err
+	ConfigPresets.RootDir = filepath.Dir(exePath)
+	ConfigPresets.CacheDir = filepath.Join(ConfigPresets.RootDir, "cache")
+	os.Mkdir(ConfigPresets.CacheDir, os.ModeDir)
+	ConfigPresets.DbDir = filepath.Join(ConfigPresets.RootDir, "db")
+	os.Mkdir(ConfigPresets.DbDir, os.ModeDir)
+	ConfigPresets.AppsDir = filepath.Join(ConfigPresets.RootDir, "apps")
+	os.Mkdir(ConfigPresets.AppsDir, os.ModeDir)
+	return nil
 }

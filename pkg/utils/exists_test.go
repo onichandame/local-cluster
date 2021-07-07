@@ -7,10 +7,10 @@ import (
 func TestFileExists(t *testing.T) {
 	const fileName = "exists_test.go"
 	const noFileName = "nofile"
-	if !FileExists(fileName) {
+	if !PathExists(fileName) {
 		t.Error("cannot find an existing file")
 	}
-	if FileExists(noFileName) {
+	if PathExists(noFileName) {
 		t.Error("finds a non-existing file")
 	}
 }

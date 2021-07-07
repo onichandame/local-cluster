@@ -9,7 +9,7 @@ type ApplicationSpec struct {
 	ApplicationID uint
 	Platform      string
 	Arch          string
-	Target        string
+	Entrypoint    string
 	DownloadUrl   string
 	Hash          string
 }
