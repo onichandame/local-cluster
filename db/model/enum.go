@@ -14,6 +14,8 @@ const (
 	TERMINATING EnumValue = "TERMINATING"
 	FINISHED    EnumValue = "FINISHED"
 	FAILED      EnumValue = "FAILED"
+	NEVER       EnumValue = "NEVER"
+	ALWAYS      EnumValue = "ALWAYS"
 )
 
 type Enum struct {
@@ -33,7 +35,7 @@ func getEnums(db *gorm.DB) (map[EnumValue]*Enum, error) {
 			recChan <- &rec
 		}
 	}
-	statuses := []EnumValue{PENDING, FINISHED, FAILED, RUNNING, TERMINATING, CREATING}
+	statuses := []EnumValue{PENDING, FINISHED, FAILED, RUNNING, TERMINATING, CREATING, ALWAYS, NEVER}
 	for _, s := range statuses {
 		go getRec(s)
 	}
@@ -74,5 +76,10 @@ func GetJobStatuses(db *gorm.DB) map[EnumValue]*Enum {
 
 func GetInstanceStatuses(db *gorm.DB) map[EnumValue]*Enum {
 	allowedEnumValues := []EnumValue{PENDING, CREATING, RUNNING, TERMINATING, FAILED, FINISHED}
+	return selectEnums(db, allowedEnumValues)
+}
+
+func GetRestartPolicies(db *gorm.DB) map[EnumValue]*Enum {
+	allowedEnumValues := []EnumValue{ALWAYS, NEVER}
 	return selectEnums(db, allowedEnumValues)
 }

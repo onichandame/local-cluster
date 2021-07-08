@@ -6,10 +6,10 @@ import (
 )
 
 type presets struct {
-	RootDir  string
-	CacheDir string
-	DbDir    string
-	AppsDir  string
+	RootDir      string
+	CacheDir     string
+	DbDir        string
+	InstancesDir string
 }
 
 var ConfigPresets = presets{}
@@ -24,7 +24,7 @@ func initPresets() error {
 	os.Mkdir(ConfigPresets.CacheDir, os.ModeDir)
 	ConfigPresets.DbDir = filepath.Join(ConfigPresets.RootDir, "db")
 	os.Mkdir(ConfigPresets.DbDir, os.ModeDir)
-	ConfigPresets.AppsDir = filepath.Join(ConfigPresets.RootDir, "apps")
-	os.Mkdir(ConfigPresets.AppsDir, os.ModeDir)
+	ConfigPresets.InstancesDir = filepath.Join(ConfigPresets.RootDir, "instances")
+	os.Mkdir(ConfigPresets.InstancesDir, os.ModeDir)
 	return nil
 }

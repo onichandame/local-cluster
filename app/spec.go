@@ -8,7 +8,7 @@ import (
 	"github.com/onichandame/local-cluster/db/model"
 )
 
-func getSpec(appDef *model.Application) (*model.ApplicationSpec, error) {
+func GetSpec(appDef *model.Application) (*model.ApplicationSpec, error) {
 	var spec *model.ApplicationSpec
 	for _, s := range appDef.Specs {
 		if s.Platform == runtime.GOOS && s.Arch == runtime.GOARCH {

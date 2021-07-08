@@ -10,6 +10,7 @@ type ApplicationSpec struct {
 	Platform      string
 	Arch          string
 	Entrypoint    string
+	Args          string
 	DownloadUrl   string
 	Hash          string
 }

@@ -9,8 +9,8 @@ import (
 	"github.com/onichandame/local-cluster/db/model"
 )
 
-func getCachePath(appDef *model.Application) (string, error) {
-	spec, err := getSpec(appDef)
+func GetCachePath(appDef *model.Application) (string, error) {
+	spec, err := GetSpec(appDef)
 	if err != nil {
 		return "", err
 	}
@@ -21,8 +21,4 @@ func getCachePath(appDef *model.Application) (string, error) {
 		cacheName = path.Base(url.URL.Path)
 	}
 	return filepath.Join(config.ConfigPresets.CacheDir, cacheName), nil
-}
-
-func getAppDir(appDef *model.Application) string {
-	return filepath.Join(config.ConfigPresets.AppsDir, appDef.Name)
 }
