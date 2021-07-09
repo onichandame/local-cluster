@@ -12,6 +12,9 @@ func JobInit() {
 
 	wg.Add(1)
 	go InitAJob(&createAdmin, &wg)
+	wg.Add(1)
+	go InitAJob(&runDashboard, &wg)
+	logrus.Info("hi")
 
 	wg.Wait()
 }

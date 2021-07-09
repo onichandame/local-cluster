@@ -1,23 +1,16 @@
 package application
 
 import (
-	"errors"
-	"fmt"
 	"runtime"
 
+	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 )
 
 func GetSpec(appDef *model.Application) (*model.ApplicationSpec, error) {
-	var spec *model.ApplicationSpec
-	for _, s := range appDef.Specs {
-		if s.Platform == runtime.GOOS && s.Arch == runtime.GOARCH {
-			spec = &s
-		}
+	spec := model.ApplicationSpec{}
+	if err := db.Db.Where("application_id = ? AND platform = ? AND arch = ?", appDef.ID, runtime.GOOS, runtime.GOARCH).First(&spec).Error; err != nil {
+		return nil, err
 	}
-	if spec == nil {
-		return nil, errors.New(fmt.Sprintf("failed to find the spec for the runtime! Platform = %s Arch = %s", runtime.GOOS, runtime.GOARCH))
-	}
-	return spec, nil
-
+	return &spec, nil
 }

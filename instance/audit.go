@@ -4,68 +4,60 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/onichandame/local-cluster/config"
+	"github.com/onichandame/local-cluster/constants"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/pkg/utils"
+	"github.com/sirupsen/logrus"
 )
 
 func Audit() error {
-	var instances []model.Instance
-	if err := db.Db.Find(&instances).Error; err != nil {
-		return err
-	}
-	runningIds, err := listLocalInstances()
+	runtimes, err := listRuntimes()
 	if err != nil {
 		return err
 	}
-	// delete unrecorded instances
-	unrecordedIds := []string{}
-	for _, id := range runningIds {
+	// delete unrecorded runtimes
+	unrecordedRuntimes := []string{}
+	for _, runtime := range runtimes {
 		exists := false
-		for _, ins := range instances {
-			if strconv.Itoa(int(ins.ID)) == id {
-				exists = true
-			}
+		if err := db.Db.Where("id = ?", runtime).First(&model.Instance{}).Error; err == nil {
+			exists = true
 		}
 		if !exists {
-			unrecordedIds = append(unrecordedIds, id)
+			unrecordedRuntimes = append(unrecordedRuntimes, runtime)
 		}
 	}
-	for _, unrecordedId := range unrecordedIds {
-		go os.Remove(filepath.Join(config.ConfigPresets.InstancesDir, unrecordedId))
+	for _, unrecordedRuntime := range unrecordedRuntimes {
+		logrus.Warnf("deleting unrecorded runtime %s", unrecordedRuntime)
+		go os.Remove(filepath.Join(config.ConfigPresets.InstancesDir, unrecordedRuntime))
 	}
-	// delete finished instances
-	finishedIds := []string{}
-	for _, ins := range instances {
-		id := strconv.Itoa(int(ins.ID))
-		if ins.Status.Value == model.FINISHED && utils.Contains(utils.StrSliceToIfSlice(runningIds), id) {
-			finishedIds = append(finishedIds, id)
+	// handle recognized runtimes
+	for _, runtime := range runtimes {
+		id, err := utils.StrToUint(runtime)
+		if err != nil {
+			logrus.Warnf("cannot parse instance id %s", runtime)
+			continue
 		}
-	}
-	for _, finishedId := range finishedIds {
-		go os.Remove(filepath.Join(config.ConfigPresets.InstancesDir, finishedId))
-	}
-	// restart
-	statuses := model.GetInstanceStatuses(db.Db)
-	policies := model.GetRestartPolicies(db.Db)
-	for _, ins := range instances {
-		_, ok := RunnersMap[ins.ID]
-		if !ok {
-			if ins.StatusID == statuses[model.RUNNING].ID {
-				// restart running instances
-				go runContext(&ins)
-			} else if ins.StatusID == statuses[model.FAILED].ID {
-				// restart failed instances if restart policy is onfailure or always
-				if utils.Contains(utils.UintSliceToIfSlice([]uint{policies[model.ALWAYS].ID, policies[model.ONFAILURE].ID}), ins.RestartPolicyID) {
-					go runContext(&ins)
+		ins := model.Instance{}
+		if err := db.Db.Where("id = ?", id).First(&ins).Error; err != nil {
+			logrus.Warnf("cannot find instance for runtime %d", id)
+		}
+		switch ins.Status {
+		case constants.RUNNING:
+			if _, ok := RunnersMap[id]; !ok {
+				setInstanceState(&ins, constants.CRASHED)
+				switch ins.RestartPolicy {
+				case constants.ALWAYS:
+					RunInstance(&ins)
 				}
-			} else if ins.StatusID == statuses[model.FINISHED].ID {
-				// restart finished instances if restart policy is always
-				if ins.RestartPolicyID == policies[model.ALWAYS].ID {
-					go runContext(&ins)
+			}
+		case constants.TERMINATED, constants.CRASHED:
+			if _, ok := RunnersMap[id]; ok {
+				if err := Terminate(&ins); err != nil {
+					logrus.Warnf("instance %d failed to terminate!", id)
+					setInstanceState(&ins, constants.CRASHED)
 				}
 			}
 		}
@@ -73,7 +65,7 @@ func Audit() error {
 	return nil
 }
 
-func listLocalInstances() ([]string, error) {
+func listRuntimes() ([]string, error) {
 	res := []string{}
 	items, err := ioutil.ReadDir(config.ConfigPresets.InstancesDir)
 	if err != nil {

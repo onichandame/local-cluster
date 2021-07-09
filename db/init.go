@@ -27,7 +27,6 @@ func loadModels() {
 	Db.AutoMigrate(&model.User{})
 	Db.AutoMigrate(&model.Credential{})
 	Db.AutoMigrate(&model.JobRecord{})
-	Db.AutoMigrate(&model.Enum{})
 	Db.AutoMigrate(&model.Application{})
 	Db.AutoMigrate(&model.ApplicationSpec{})
 	Db.AutoMigrate(&model.Instance{})

@@ -1,12 +1,14 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"github.com/onichandame/local-cluster/constants"
+	"gorm.io/gorm"
+)
 
 type InstanceTemplate struct {
 	ApplicationID   uint
 	Application     Application
-	RestartPolicyID uint
-	RestartPolicy   Enum
+	RestartPolicy   constants.InstanceRestartPolicy
 	Env             string
 	Port            string
 	InstanceGroupID uint

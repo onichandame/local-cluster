@@ -1,11 +1,14 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"github.com/onichandame/local-cluster/constants"
+	"gorm.io/gorm"
+)
 
 type Instance struct {
 	gorm.Model
 	InstanceTemplate
 	StatusID uint
-	Status   Enum
+	Status   constants.InstanceStatus
 	GroupID  uint
 }
