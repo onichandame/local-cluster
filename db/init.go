@@ -32,6 +32,6 @@ func loadModels() {
 	Db.AutoMigrate(&model.ApplicationSpec{})
 	Db.AutoMigrate(&model.Instance{})
 	Db.AutoMigrate(&model.InstanceGroup{})
-	Db.AutoMigrate(&model.InstanceGroupTemplate{})
+	Db.AutoMigrate(&model.InstanceTemplate{})
 	Db.AutoMigrate(&model.Entrance{})
 }

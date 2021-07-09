@@ -16,6 +16,7 @@ const (
 	FAILED      EnumValue = "FAILED"
 	NEVER       EnumValue = "NEVER"
 	ALWAYS      EnumValue = "ALWAYS"
+	ONFAILURE   EnumValue = "ONFAILURE"
 )
 
 type Enum struct {
@@ -80,6 +81,6 @@ func GetInstanceStatuses(db *gorm.DB) map[EnumValue]*Enum {
 }
 
 func GetRestartPolicies(db *gorm.DB) map[EnumValue]*Enum {
-	allowedEnumValues := []EnumValue{ALWAYS, NEVER}
+	allowedEnumValues := []EnumValue{ALWAYS, NEVER, ONFAILURE}
 	return selectEnums(db, allowedEnumValues)
 }

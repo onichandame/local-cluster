@@ -6,17 +6,18 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/onichandame/local-cluster/config"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/pkg/utils"
 )
 
-func AuditApps(appDef *model.Application) error {
+func Audit() error {
 	var instances []model.Instance
-	if err := db.Db.Where("application_id = ?", appDef.ID).Find(&instances).Error; err != nil {
+	if err := db.Db.Find(&instances).Error; err != nil {
 		return err
 	}
-	runningIds, err := listLocalInstances(appDef)
+	runningIds, err := listLocalInstances()
 	if err != nil {
 		return err
 	}
@@ -34,7 +35,7 @@ func AuditApps(appDef *model.Application) error {
 		}
 	}
 	for _, unrecordedId := range unrecordedIds {
-		go os.Remove(filepath.Join(getAppDir(appDef), unrecordedId))
+		go os.Remove(filepath.Join(config.ConfigPresets.InstancesDir, unrecordedId))
 	}
 	// delete finished instances
 	finishedIds := []string{}
@@ -45,15 +46,36 @@ func AuditApps(appDef *model.Application) error {
 		}
 	}
 	for _, finishedId := range finishedIds {
-		go os.Remove(filepath.Join(getAppDir(appDef), finishedId))
+		go os.Remove(filepath.Join(config.ConfigPresets.InstancesDir, finishedId))
+	}
+	// restart
+	statuses := model.GetInstanceStatuses(db.Db)
+	policies := model.GetRestartPolicies(db.Db)
+	for _, ins := range instances {
+		_, ok := RunnersMap[ins.ID]
+		if !ok {
+			if ins.StatusID == statuses[model.RUNNING].ID {
+				// restart running instances
+				go runContext(&ins)
+			} else if ins.StatusID == statuses[model.FAILED].ID {
+				// restart failed instances if restart policy is onfailure or always
+				if utils.Contains(utils.UintSliceToIfSlice([]uint{policies[model.ALWAYS].ID, policies[model.ONFAILURE].ID}), ins.RestartPolicyID) {
+					go runContext(&ins)
+				}
+			} else if ins.StatusID == statuses[model.FINISHED].ID {
+				// restart finished instances if restart policy is always
+				if ins.RestartPolicyID == policies[model.ALWAYS].ID {
+					go runContext(&ins)
+				}
+			}
+		}
 	}
 	return nil
 }
 
-func listLocalInstances(appDef *model.Application) ([]string, error) {
+func listLocalInstances() ([]string, error) {
 	res := []string{}
-	appDir := getAppDir(appDef)
-	items, err := ioutil.ReadDir(appDir)
+	items, err := ioutil.ReadDir(config.ConfigPresets.InstancesDir)
 	if err != nil {
 		return res, err
 	}

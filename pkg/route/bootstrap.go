@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func Bootstrap(r *Route, g *gin.RouterGroup) {
@@ -18,19 +19,19 @@ func Bootstrap(r *Route, g *gin.RouterGroup) {
 			}
 			var body []byte
 			var contentType string
-			if res, ok := res.([]byte); ok {
-				body = res
+			if r, ok := res.([]byte); ok {
+				body = r
 				contentType = "text/plain"
-			}
-			if res, ok := res.(string); ok {
-				body = []byte(res)
+			} else if r, ok := res.(string); ok {
+				body = []byte(r)
 				contentType = "text/plain"
-			}
-			if res, ok := res.(map[string]interface{}); ok {
+			} else {
+				logrus.Info(res)
 				if body, err = json.Marshal(res); err != nil {
 					c.JSON(500, gin.H{"message": err.Error()})
 					return
 				}
+				logrus.Info(body)
 				contentType = "application/json"
 			}
 			c.Data(200, contentType, body)

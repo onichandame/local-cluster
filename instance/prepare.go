@@ -3,14 +3,14 @@ package instance
 import (
 	"os"
 
-	"github.com/onichandame/local-cluster/app"
+	"github.com/onichandame/local-cluster/application"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/pkg/utils"
 )
 
 func prepareRuntime(insDef *model.Instance) error {
 	insDir := getInsDir(insDef)
-	cachePath, err := app.GetCachePath(&insDef.Application)
+	cachePath, err := application.GetCachePath(&insDef.Application)
 	if err != nil {
 		return err
 	}

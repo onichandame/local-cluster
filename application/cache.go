@@ -1,4 +1,4 @@
-package app
+package application
 
 import (
 	"os"
@@ -17,17 +17,21 @@ func PrepareCache(appDef *model.Application) error {
 		return err
 	}
 	if utils.PathExists(cachePath) {
-		if err := utils.CheckFileHash(cachePath, spec.Hash); err != nil {
-			os.Remove(cachePath)
-			utils.Download(spec.DownloadUrl, cachePath)
+		if spec.Hash != "" {
 			if err := utils.CheckFileHash(cachePath, spec.Hash); err != nil {
-				return err
+				os.Remove(cachePath)
+				utils.Download(spec.DownloadUrl, cachePath)
+				if err := utils.CheckFileHash(cachePath, spec.Hash); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
 		utils.Download(spec.DownloadUrl, cachePath)
-		if err := utils.CheckFileHash(cachePath, spec.Hash); err != nil {
-			return err
+		if spec.Hash != "" {
+			if err := utils.CheckFileHash(cachePath, spec.Hash); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
