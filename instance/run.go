@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/onichandame/local-cluster/application"
@@ -16,6 +17,7 @@ import (
 
 func RunInstance(insDef *model.Instance) error {
 	// create instance data if not already
+	var err error
 	if insDef.ID == 0 {
 		if err := initInstance(insDef); err != nil {
 			return err
@@ -26,6 +28,18 @@ func RunInstance(insDef *model.Instance) error {
 		return errors.New(fmt.Sprintf("instance %d already running! If it is not, run audit instead", insDef.ID))
 	}
 	// prepare runtime directory
+	setInstanceState(insDef, constants.CREATING)
+	defer func() {
+		var finalState constants.InstanceStatus
+		if err == nil {
+			logrus.Infof("instance %d is now running", insDef.ID)
+			finalState = constants.RUNNING
+		} else {
+			logrus.Warnf("instance %d failed to start", insDef.ID)
+			finalState = constants.CRASHED
+		}
+		setInstanceState(insDef, finalState)
+	}()
 	app := model.Application{}
 	if err := db.Db.First(&app, insDef.ApplicationID).Error; err != nil {
 		return err
@@ -47,13 +61,27 @@ func RunInstance(insDef *model.Instance) error {
 	RunnersMap[insDef.ID] = &Runner{cmd: cmd, cancel: cancel}
 	cmd.Dir = insDir
 	cmd.Env = append(cmd.Env, parseEnv(insDef)...)
+	// prepare interfaces
+	ifDefs := []model.ApplicationInterface{}
+	if err := db.Db.Where("application_id = ?", app.ID).Find(&ifDefs).Error; err != nil {
+		return err
+	}
+	for _, ifDef := range ifDefs {
+		insIf, err := createInterface(insDef, &ifDef)
+		if err != nil {
+			return err
+		}
+		if ifDef.PortByEnv != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%d", ifDef.PortByEnv, insIf.Port))
+		}
+		if ifDef.PortByArg != "" {
+			cmd.Args = append(cmd.Args, ifDef.PortByArg, strconv.Itoa(int(insIf.Port)))
+		}
+	}
 	if err := cmd.Start(); err != nil {
-		go setInstanceState(insDef, constants.CRASHED)
-		logrus.Warnf("failed to start instance %d", insDef.ID)
 		return err
 	}
 	handleExit(insDef)
-	go setInstanceState(insDef, constants.RUNNING)
 	return nil
 }
 
