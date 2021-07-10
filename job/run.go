@@ -3,6 +3,7 @@ package job
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/onichandame/local-cluster/constants"
 	"github.com/onichandame/local-cluster/db"
@@ -13,7 +14,18 @@ import (
 
 var errJobAlreadyRun = errors.New(fmt.Sprintf("job already created by another runner"))
 
-func runJob(job *job) {
+func runJob(job *job, wg *sync.WaitGroup) {
+	// wait for all jobs inited
+	initedWG.Wait()
+	for _, dep := range job.dependsOn {
+		jobInitMap[dep].Wait()
+	}
+	// done the job after run
+	defer func() {
+		if wg != nil {
+			wg.Done()
+		}
+	}()
 	if job.totalRuns != 0 {
 		runs, err := countRuns(struct {
 			job     string

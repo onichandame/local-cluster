@@ -8,7 +8,6 @@ import (
 type Instance struct {
 	gorm.Model
 	InstanceTemplate
-	StatusID uint
-	Status   constants.InstanceStatus
-	GroupID  uint
+	Status  constants.InstanceStatus
+	GroupID uint
 }

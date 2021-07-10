@@ -9,6 +9,7 @@ import (
 var runDashboard = job{
 	immediate: true,
 	name:      "RunDashboard",
+	dependsOn: []*job{&auditInstances},
 	run: func() error {
 		ins, err := getOrCreateIns()
 		if err != nil {
@@ -25,7 +26,7 @@ func getOrCreateApp() (*model.Application, error) {
 	var err error
 	app := model.Application{}
 	app.Name = "dashboard"
-	app.Specs = []model.ApplicationSpec{{DownloadUrl: "https://github.com/onichandame/local-cluster-dashboard/releases/download/latest/release.tar.gz", Platform: "linux", Arch: "amd64", Entrypoint: "scripts/linux.sh"}}
+	app.Specs = []model.ApplicationSpec{{DownloadUrl: "https://github.com/onichandame/local-cluster-dashboard/releases/download/latest/release.tar.gz", Platform: "linux", Arch: "amd64", Entrypoint: "npx", Args: "serve build"}}
 	if err := db.Db.Where("name = ?", app.Name).FirstOrCreate(&app).Error; err != nil {
 		return nil, err
 	}

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/onichandame/local-cluster/application"
@@ -27,22 +26,24 @@ func RunInstance(insDef *model.Instance) error {
 		return errors.New(fmt.Sprintf("instance %d already running! If it is not, run audit instead", insDef.ID))
 	}
 	// prepare runtime directory
-	if err := application.PrepareCache(&insDef.Application); err != nil {
-		return err
-	}
-	prepareRuntime(insDef)
-	// prepare the cmd context
-	insDir := getInsDir(insDef)
 	app := model.Application{}
 	if err := db.Db.First(&app, insDef.ApplicationID).Error; err != nil {
 		return err
 	}
+	if err := application.PrepareCache(&app); err != nil {
+		return err
+	}
+	if err := prepareRuntime(insDef); err != nil {
+		return err
+	}
+	// prepare the cmd context
+	insDir := getInsDir(insDef)
 	spec, err := application.GetSpec(&app)
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, filepath.Join(insDir, spec.Entrypoint), spec.Args)
+	cmd := exec.CommandContext(ctx, spec.Entrypoint, strings.Split(spec.Args, " ")...)
 	RunnersMap[insDef.ID] = &Runner{cmd: cmd, cancel: cancel}
 	cmd.Dir = insDir
 	cmd.Env = append(cmd.Env, parseEnv(insDef)...)

@@ -7,6 +7,7 @@ import (
 	"github.com/onichandame/local-cluster/db/model"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var Db *gorm.DB
@@ -14,7 +15,7 @@ var Db *gorm.DB
 func DBInit() {
 	dbDir := config.ConfigPresets.DbDir
 	dbPath := filepath.Join(dbDir, "core.sqlite")
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		panic("failed to open core database")
 	}

@@ -5,7 +5,9 @@ type job struct {
 	run            func() error
 	fatal          bool
 	immediate      bool
+	blocking       bool
 	interval       string
 	successfulRuns uint
 	totalRuns      uint
+	dependsOn      []*job
 }

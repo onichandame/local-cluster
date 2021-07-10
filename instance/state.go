@@ -22,7 +22,7 @@ func initInstance(insDef *model.Instance) error {
 }
 
 func setInstanceState(insDef *model.Instance, state constants.InstanceStatus) error {
-	if err := db.Db.Where("id = ?", insDef.ID).Update("status", state).Error; err != nil {
+	if err := db.Db.Model(&model.Instance{}).Where("id = ?", insDef.ID).Update("status", state).Error; err != nil {
 		return err
 	}
 	return nil

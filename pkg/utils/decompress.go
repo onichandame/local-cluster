@@ -11,19 +11,17 @@ import (
 )
 
 func DecompressTarGZ(archivePath string, dest string) error {
-	if !PathExists(dest) {
-	}
 	archive, err := os.Open(archivePath)
 	if err != nil {
 		return err
 	}
 	defer archive.Close()
-	archReader, err := gzip.NewReader(archive)
+	gzReader, err := gzip.NewReader(archive)
 	if err != nil {
 		return err
 	}
-	defer archReader.Close()
-	tarReader := tar.NewReader(archReader)
+	defer gzReader.Close()
+	tarReader := tar.NewReader(gzReader)
 	for {
 		entry, err := tarReader.Next()
 		if err != nil {
@@ -37,12 +35,21 @@ func DecompressTarGZ(archivePath string, dest string) error {
 		if entryPath == "" {
 			return errors.New(fmt.Sprintf("failed to get path for entry %s", entry.Name))
 		}
-		entryFile, err := createEntryFile(entryPath)
-		if err != nil {
-			return err
+		switch entry.Typeflag {
+		case tar.TypeDir:
+			if err := os.Mkdir(entryPath, os.ModeDir); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			entryFile, err := createEntryFile(entryPath)
+			if err != nil {
+				return err
+			}
+			defer entryFile.Close()
+			io.Copy(entryFile, tarReader)
+		default:
+			return errors.New(fmt.Sprintf("extract unknown type %d", entry.Typeflag))
 		}
-		defer entryFile.Close()
-		io.Copy(entryFile, tarReader)
 	}
 	return nil
 }

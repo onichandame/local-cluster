@@ -7,10 +7,10 @@ import (
 
 type JobRecord struct {
 	gorm.Model
-	Job      string
+	Job      string `gorm:"index:linked_list,unique"`
 	StatusID uint
 	Status   constants.JobStatus
-	PrevID   uint `gorm:"unique"`
+	PrevID   uint `gorm:"index:linked_list,unique"`
 	Prev     *JobRecord
 	Output   string
 	RunByID  uint
