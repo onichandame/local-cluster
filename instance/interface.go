@@ -14,6 +14,7 @@ func createInterface(insDef *model.Instance, ifDef *model.ApplicationInterface) 
 	}
 	insIf := model.InstanceInterface{}
 	insIf.InstanceID = insDef.ID
+	insIf.ApplicationInterfaceID = ifDef.ID
 	if err := db.Db.Create(&insIf).Error; err != nil {
 		return nil, err
 	}
