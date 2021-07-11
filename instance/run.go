@@ -19,7 +19,7 @@ func RunInstance(insDef *model.Instance) error {
 	// create instance data if not already
 	var err error
 	if insDef.ID == 0 {
-		if err := initInstance(insDef); err != nil {
+		if err = initInstance(insDef); err != nil {
 			return err
 		}
 	}
@@ -36,18 +36,19 @@ func RunInstance(insDef *model.Instance) error {
 			finalState = constants.RUNNING
 		} else {
 			logrus.Warnf("instance %d failed to start", insDef.ID)
+			logrus.Error(err)
 			finalState = constants.CRASHED
 		}
 		setInstanceState(insDef, finalState)
 	}()
 	app := model.Application{}
-	if err := db.Db.First(&app, insDef.ApplicationID).Error; err != nil {
+	if err = db.Db.First(&app, insDef.ApplicationID).Error; err != nil {
 		return err
 	}
-	if err := application.PrepareCache(&app); err != nil {
+	if err = application.PrepareCache(&app); err != nil {
 		return err
 	}
-	if err := prepareRuntime(insDef); err != nil {
+	if err = prepareRuntime(insDef); err != nil {
 		return err
 	}
 	// prepare the cmd context
@@ -63,7 +64,7 @@ func RunInstance(insDef *model.Instance) error {
 	cmd.Env = append(cmd.Env, parseEnv(insDef)...)
 	// prepare interfaces
 	ifDefs := []model.ApplicationInterface{}
-	if err := db.Db.Where("application_id = ?", app.ID).Find(&ifDefs).Error; err != nil {
+	if err = db.Db.Where("application_id = ?", app.ID).Find(&ifDefs).Error; err != nil {
 		return err
 	}
 	for _, ifDef := range ifDefs {
@@ -78,7 +79,7 @@ func RunInstance(insDef *model.Instance) error {
 			cmd.Args = append(cmd.Args, ifDef.PortByArg, strconv.Itoa(int(insIf.Port)))
 		}
 	}
-	if err := cmd.Start(); err != nil {
+	if err = cmd.Start(); err != nil {
 		return err
 	}
 	handleExit(insDef)
@@ -89,7 +90,20 @@ func handleExit(insDef *model.Instance) {
 	runner, ok := RunnersMap[insDef.ID]
 	delete(RunnersMap, insDef.ID)
 	handler := func() {
-		err := runner.cmd.Wait()
+		var err error
+		defer func() {
+			var finalState constants.InstanceStatus
+			if err == nil {
+				finalState = constants.TERMINATED
+			} else {
+				finalState = constants.CRASHED
+			}
+			setInstanceState(insDef, finalState)
+		}()
+		err = runner.cmd.Wait()
+		if err != nil {
+			return
+		}
 		if err == nil {
 			setInstanceState(insDef, constants.TERMINATED)
 			if insDef.RestartPolicy == constants.ALWAYS {

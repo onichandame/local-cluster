@@ -1,9 +1,14 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"github.com/onichandame/local-cluster/constants"
+	"gorm.io/gorm"
+)
 
 type InstanceGroup struct {
 	gorm.Model
 	Replicas uint
-	Template InstanceTemplate
+	Status   constants.InstanceGroupStatus
+	InstanceTemplate
+	Instances []Instance
 }

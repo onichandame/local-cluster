@@ -3,7 +3,7 @@ package job
 import (
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
-	"github.com/onichandame/local-cluster/instance"
+	"github.com/onichandame/local-cluster/instance_group"
 )
 
 var runDashboard = job{
@@ -11,11 +11,11 @@ var runDashboard = job{
 	name:      "RunDashboard",
 	dependsOn: []*job{&auditInstances},
 	run: func() error {
-		ins, err := getOrCreateIns()
+		ig, err := getOrCreateInsGrp()
 		if err != nil {
 			return err
 		}
-		if err := instance.RunInstance(ins); err != nil {
+		if err := instancegroup.Start(ig); err != nil {
 			return err
 		}
 		return nil
@@ -46,17 +46,17 @@ func getOrCreateApp() (*model.Application, error) {
 	return &app, err
 }
 
-func getOrCreateIns() (*model.Instance, error) {
+func getOrCreateInsGrp() (*model.InstanceGroup, error) {
 	var err error
 	app, err := getOrCreateApp()
 	if err != nil {
 		return nil, err
 	}
-	ins := model.Instance{}
-	ins.ApplicationID = app.ID
-	ins.Env = "PORT=3001"
-	if err := db.Db.Where("application_id = ?", ins.ApplicationID).FirstOrCreate(&ins).Error; err != nil {
+	ig := model.InstanceGroup{}
+	ig.Replicas = 1
+	ig.ApplicationID = app.ID
+	if err := db.Db.Where("application_id = ?", ig.ApplicationID).FirstOrCreate(&ig).Error; err != nil {
 		return nil, err
 	}
-	return &ins, err
+	return &ig, err
 }
