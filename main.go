@@ -20,7 +20,7 @@ func main() {
 func preBootstrap() {
 	config.ConfigInit()
 	db.DBInit()
-	job.JobInit()
+	job.JobsInit()
 
 	if err := instance.Audit(); err != nil {
 		panic(err)

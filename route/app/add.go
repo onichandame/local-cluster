@@ -17,7 +17,7 @@ var AppAdd = route.Route{
 			Specs []struct {
 				Platform    string `json:"platform" binding:"required"`
 				Arch        string `json:"arch" binding:"required"`
-				Entrypoint  string `json:"target" binding:"required"`
+				Command     string `json:"command" binding:"required"`
 				Args        string `json:"args"`
 				DownloadUrl string `json:"download_url" binding:"required"`
 				Hash        string `json:"hash"`
@@ -33,7 +33,7 @@ var AppAdd = route.Route{
 			return nil, err
 		}
 		for _, s := range requestBody.Specs {
-			app.Specs = append(app.Specs, model.ApplicationSpec{Platform: s.Platform, Arch: s.Arch, Entrypoint: s.Entrypoint, DownloadUrl: s.DownloadUrl, Hash: s.Hash})
+			app.Specs = append(app.Specs, model.ApplicationSpec{Platform: s.Platform, Arch: s.Arch, Command: s.Command, DownloadUrl: s.DownloadUrl, Hash: s.Hash})
 		}
 		if err := db.Db.Create(&app).Error; err != nil {
 			return nil, err

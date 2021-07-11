@@ -1,33 +1,38 @@
 package job
 
 import (
-	"sync"
 	"time"
 
+	"github.com/chebyrash/promise"
 	"github.com/sirupsen/logrus"
 )
 
-var jobInitMap = make(map[*job]*sync.WaitGroup)
-var initedWG = sync.WaitGroup{}
+var jobInitMap = make(map[*job]*promise.Promise)
 
-func JobInit() {
-	initedWG.Add(1)
+func JobsInit() {
 	allJobs := []*job{&createAdmin, &runDashboard, &auditInstances}
 	for _, j := range allJobs {
-		jobInitMap[j] = initAJob(j)
+		if _, ok := jobInitMap[j]; !ok {
+			initAJob(j)
+		}
 	}
-	initedWG.Done()
+	allPs := []*promise.Promise{}
+	for _, p := range jobInitMap {
+		allPs = append(allPs, p)
+	}
+	if _, err := promise.All(allPs...).Await(); err != nil {
+		logrus.Error(err)
+		panic("failed to init all jobs")
+	}
 }
 
-func initAJob(j *job) *sync.WaitGroup {
+func initAJob(j *job) {
+	// skip if already inited
+	if _, ok := jobInitMap[j]; ok {
+		return
+	}
+	// check if circular dependency exists
 	logrus.Infof("initializing job %s", j.name)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	defer func() {
-		if !j.blocking {
-			wg.Done()
-		}
-	}()
 	initInterval := func() {
 		duration, err := time.ParseDuration(j.interval)
 		if err != nil {
@@ -37,20 +42,30 @@ func initAJob(j *job) *sync.WaitGroup {
 		for {
 			select {
 			case <-ticker.C:
-				go runJob(j, nil)
+				go runJob(j)
 			}
 		}
 	}
-	if j.interval != "" {
-		go initInterval()
-	}
-	if j.immediate {
-		if j.blocking {
-			go runJob(j, &wg)
-		} else {
-			go runJob(j, nil)
+	jobInitMap[j] = promise.New(func(resolve func(promise.Any), reject func(error)) {
+		for _, dep := range j.dependsOn {
+			initAJob(dep)
+			if _, err := jobInitMap[dep].Await(); err != nil {
+				panic(err)
+			}
 		}
-	}
-	logrus.Infof("initialized job %s", j.name)
-	return &wg
+		if j.interval != "" {
+			go initInterval()
+		}
+		if j.immediate {
+			if j.blocking {
+				if err := runJob(j); err != nil {
+					panic(err)
+				}
+			} else {
+				go runJob(j)
+			}
+		}
+		logrus.Infof("initialized job %s", j.name)
+		resolve(nil)
+	})
 }

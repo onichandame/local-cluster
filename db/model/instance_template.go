@@ -7,8 +7,8 @@ import (
 
 type InstanceTemplate struct {
 	gorm.Model
-	InstanceGroupID uint `gorm:"not null"`
-	ApplicationID   uint `gorm:"not null"`
+	InstanceGroupID uint
+	ApplicationID   uint
 	Application     Application
 	RestartPolicy   constants.InstanceRestartPolicy
 	Env             string

@@ -4,8 +4,8 @@ import "gorm.io/gorm"
 
 type ApplicationInterface struct {
 	gorm.Model
-	ApplicationID uint
-	Name          string `gorm:"unique;not null"`
+	ApplicationID uint `gorm:"not null"`
+	Name          string
 	PortByEnv     string
 	PortByArg     string
 }

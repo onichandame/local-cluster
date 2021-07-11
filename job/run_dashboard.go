@@ -37,7 +37,7 @@ func getOrCreateApp() (*model.Application, error) {
 			DownloadUrl: "https://github.com/onichandame/local-cluster-dashboard/releases/download/latest/release.tar.gz",
 			Platform:    "linux",
 			Arch:        "amd64",
-			Entrypoint:  "npx",
+			Command:     "npx",
 			Args:        "serve build"},
 	}
 	if err := db.Db.Where("name = ?", app.Name).FirstOrCreate(&app).Error; err != nil {

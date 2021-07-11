@@ -2,9 +2,11 @@ package db
 
 import (
 	"path/filepath"
+	"reflect"
 
 	"github.com/onichandame/local-cluster/config"
 	"github.com/onichandame/local-cluster/db/model"
+	"github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -25,14 +27,28 @@ func DBInit() {
 }
 
 func loadModels() {
-	Db.AutoMigrate(&model.User{})
-	Db.AutoMigrate(&model.Credential{})
-	Db.AutoMigrate(&model.JobRecord{})
-	Db.AutoMigrate(&model.Application{})
-	Db.AutoMigrate(&model.ApplicationSpec{})
-	Db.AutoMigrate(&model.Instance{})
-	Db.AutoMigrate(&model.InstanceGroup{})
-	Db.AutoMigrate(&model.Entrance{})
-	Db.AutoMigrate(&model.ApplicationInterface{})
-	Db.AutoMigrate(&model.InstanceInterface{})
+	loadAModel := func(model interface{}) {
+		if err := Db.AutoMigrate(model); err != nil {
+			logrus.Error(err)
+			if t := reflect.TypeOf(model); t.Kind() == reflect.Ptr {
+				modelName := "*" + t.Elem().Name()
+				logrus.Fatalf("failed to init table %s", modelName)
+			}
+		}
+	}
+	models := []interface{}{
+		&model.User{},
+		&model.Credential{},
+		&model.JobRecord{},
+		&model.ApplicationSpec{},
+		&model.ApplicationInterface{},
+		&model.Application{},
+		&model.InstanceInterface{},
+		&model.Instance{},
+		&model.InstanceGroup{},
+		&model.Entrance{},
+	}
+	for _, m := range models {
+		loadAModel(m)
+	}
 }

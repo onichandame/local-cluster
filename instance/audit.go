@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/onichandame/local-cluster/config"
 	"github.com/onichandame/local-cluster/constants"
@@ -18,22 +19,18 @@ func Audit() error {
 	if err != nil {
 		return err
 	}
-	// delete unrecorded runtimes
-	unrecordedRuntimes := []string{}
-	for _, runtime := range runtimes {
-		exists := false
-		if err := db.Db.Where("id = ?", runtime).First(&model.Instance{}).Error; err == nil {
-			exists = true
-		}
-		if !exists {
-			unrecordedRuntimes = append(unrecordedRuntimes, runtime)
+	// audit not-settled instances
+	notSettledInstances := []model.Instance{}
+	if err := db.Db.Where("status NOT IN ?", []constants.InstanceStatus{constants.TERMINATED, constants.CRASHED}).Find(&notSettledInstances).Error; err != nil {
+		return err
+	}
+	for _, ins := range notSettledInstances {
+		_, running := RunnersMap[ins.ID]
+		if !utils.Contains(utils.StrSliceToIfSlice(runtimes), strconv.Itoa(int(ins.ID))) || !running {
+			setInstanceState(&ins, constants.CRASHED)
 		}
 	}
-	for _, unrecordedRuntime := range unrecordedRuntimes {
-		logrus.Warnf("deleting unrecorded runtime %s", unrecordedRuntime)
-		go os.Remove(filepath.Join(config.ConfigPresets.InstancesDir, unrecordedRuntime))
-	}
-	// handle recognized runtimes
+	// remove unused runtimes
 	for _, runtime := range runtimes {
 		id, err := utils.StrToUint(runtime)
 		if err != nil {
@@ -41,25 +38,24 @@ func Audit() error {
 			continue
 		}
 		ins := model.Instance{}
-		if err := db.Db.Where("id = ?", id).First(&ins).Error; err != nil {
-			logrus.Warnf("cannot find instance for runtime %d", id)
+		if err := db.Db.Where("id = ? AND status IN ?", id, []constants.InstanceStatus{constants.CREATING, constants.RUNNING, constants.TERMINATING}).First(&ins).Error; err != nil {
+			logrus.Warnf("cannot find active instance for runtime %d. deleting it", id)
+			if err := os.RemoveAll(filepath.Join(config.ConfigPresets.InstancesDir, runtime)); err != nil {
+				logrus.Warnf("failed to delete unused runtime %d", id)
+			}
 		}
-		switch ins.Status {
-		case constants.RUNNING:
-			if _, ok := RunnersMap[id]; !ok {
-				setInstanceState(&ins, constants.CRASHED)
-				switch ins.RestartPolicy {
-				case constants.ALWAYS:
-					RunInstance(&ins)
-				}
-			}
-		case constants.TERMINATED, constants.CRASHED:
-			if _, ok := RunnersMap[id]; ok {
-				if err := Terminate(&ins); err != nil {
-					logrus.Warnf("instance %d failed to terminate!", id)
-					setInstanceState(&ins, constants.CRASHED)
-				}
-			}
+	}
+	// restart crashed instance if required
+	crashedRows, err := db.Db.Model(&model.Instance{}).Where("status = ?", constants.CRASHED).Rows()
+	defer crashedRows.Close()
+	var crashedRow model.Instance
+	for crashedRows.Next() {
+		if err := db.Db.ScanRows(crashedRows, &crashedRow); err != nil {
+			return err
+		}
+		switch crashedRow.RestartPolicy {
+		case constants.ALWAYS:
+			RunInstance(&crashedRow)
 		}
 	}
 	return nil

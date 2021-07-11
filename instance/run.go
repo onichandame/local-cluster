@@ -58,7 +58,7 @@ func RunInstance(insDef *model.Instance) error {
 		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, spec.Entrypoint, strings.Split(spec.Args, " ")...)
+	cmd := exec.CommandContext(ctx, spec.Command, strings.Split(spec.Args, " ")...)
 	RunnersMap[insDef.ID] = &Runner{cmd: cmd, cancel: cancel}
 	cmd.Dir = insDir
 	cmd.Env = append(cmd.Env, parseEnv(insDef)...)
@@ -68,7 +68,7 @@ func RunInstance(insDef *model.Instance) error {
 		return err
 	}
 	for _, ifDef := range ifDefs {
-		insIf, err := createInterface(insDef, &ifDef)
+		insIf, err := createInterface(insDef)
 		if err != nil {
 			return err
 		}
@@ -89,29 +89,15 @@ func RunInstance(insDef *model.Instance) error {
 func handleExit(insDef *model.Instance) {
 	runner, ok := RunnersMap[insDef.ID]
 	delete(RunnersMap, insDef.ID)
+	isTerminating := insDef.Status == constants.TERMINATING
 	handler := func() {
-		var err error
-		defer func() {
-			var finalState constants.InstanceStatus
-			if err == nil {
-				finalState = constants.TERMINATED
-			} else {
-				finalState = constants.CRASHED
-			}
-			setInstanceState(insDef, finalState)
-		}()
-		err = runner.cmd.Wait()
-		if err != nil {
-			return
+		if err := runner.cmd.Wait(); err != nil {
+			logrus.Debug(err)
 		}
-		if err == nil {
-			setInstanceState(insDef, constants.TERMINATED)
-			if insDef.RestartPolicy == constants.ALWAYS {
-				go RunInstance(insDef)
-			}
+		if isTerminating {
+			logrus.Debugf("instance %d terminated", insDef.ID)
 		} else {
-			logrus.Warnf("instance %d exit with error", insDef.ID)
-			logrus.Warn(err)
+			logrus.Warnf("instance %d crashed", insDef.ID)
 			setInstanceState(insDef, constants.CRASHED)
 			switch insDef.RestartPolicy {
 			case constants.ALWAYS, constants.ONFAILURE:

@@ -10,5 +10,5 @@ type Instance struct {
 	InstanceTemplate
 	Status          constants.InstanceStatus
 	InstanceGroupID uint
-	Interfaces      []InstanceInterface
+	Interfaces      []InstanceInterface `gorm:"foreignKey:InstanceID"`
 }

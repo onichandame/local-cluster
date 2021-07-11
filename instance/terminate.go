@@ -1,17 +1,18 @@
 package instance
 
 import (
-	"errors"
-
+	"github.com/onichandame/local-cluster/constants"
 	"github.com/onichandame/local-cluster/db/model"
 )
 
 func Terminate(insDef *model.Instance) error {
-	runner, ok := RunnersMap[insDef.ID]
-	delete(RunnersMap, insDef.ID)
-	if !ok {
-		return errors.New("cannot terminate a not-running instance. crash it!")
+	if err := setInstanceState(insDef, constants.TERMINATING); err != nil {
+		return err
 	}
-	runner.cancel()
+	if runner, ok := RunnersMap[insDef.ID]; ok {
+		runner.cancel()
+		runner.cmd.Wait()
+	}
+	setInstanceState(insDef, constants.TERMINATED)
 	return nil
 }
