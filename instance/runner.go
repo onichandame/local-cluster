@@ -3,6 +3,7 @@ package instance
 import (
 	"context"
 	"os/exec"
+	"sync"
 )
 
 type Runner struct {
@@ -11,3 +12,4 @@ type Runner struct {
 }
 
 var RunnersMap = map[uint]*Runner{}
+var RMLock sync.Mutex

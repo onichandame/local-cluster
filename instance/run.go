@@ -16,6 +16,9 @@ import (
 )
 
 func RunInstance(insDef *model.Instance) error {
+	// Only one instance can be starting at a moment
+	RMLock.Lock()
+	defer func() { RMLock.Unlock() }()
 	// create instance data if not already
 	var err error
 	if insDef.ID == 0 {
@@ -68,7 +71,7 @@ func RunInstance(insDef *model.Instance) error {
 		return err
 	}
 	for _, ifDef := range ifDefs {
-		insIf, err := createInterface(insDef)
+		insIf, err := createInterface(insDef, &ifDef)
 		if err != nil {
 			return err
 		}

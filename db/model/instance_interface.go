@@ -4,6 +4,8 @@ import "gorm.io/gorm"
 
 type InstanceInterface struct {
 	gorm.Model
-	InstanceID uint `gorm:"not null"`
-	Port       uint
+	InstanceID   uint `gorm:"not null"`
+	Port         uint
+	DefinitionID uint `gorm:"not null"`
+	Definition   *ApplicationInterface
 }

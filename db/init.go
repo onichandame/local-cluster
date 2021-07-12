@@ -36,17 +36,18 @@ func loadModels() {
 			}
 		}
 	}
+	// order matters! do not shuffle randomly
 	models := []interface{}{
 		&model.User{},
 		&model.Credential{},
 		&model.JobRecord{},
 		&model.ApplicationSpec{},
+		&model.InstanceGroupEntrance{},
 		&model.ApplicationInterface{},
-		&model.Application{},
 		&model.InstanceInterface{},
+		&model.Application{},
 		&model.Instance{},
 		&model.InstanceGroup{},
-		&model.Entrance{},
 	}
 	for _, m := range models {
 		loadAModel(m)
