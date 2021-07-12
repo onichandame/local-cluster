@@ -10,5 +10,6 @@ type InstanceGroup struct {
 	Replicas uint
 	Status   constants.InstanceGroupStatus
 	InstanceTemplate
-	Instances []Instance
+	Instances  []Instance
+	Interfaces []ServiceInterface `gorm:"polymorphic:Service"`
 }

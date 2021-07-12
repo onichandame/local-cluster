@@ -8,9 +8,13 @@ import (
 	"github.com/onichandame/local-cluster/constants"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
+	"github.com/onichandame/local-cluster/pkg/utils"
 )
 
-func Register(ifDef *model.InstanceInterface) error {
+func Register(ifDef *model.ServiceInterface) error {
+	// mutex lock
+	Lock.Lock()
+	defer func() { Lock.Unlock() }()
 	if ifDef.Port != 0 {
 		return errors.New(fmt.Sprintf("interface already registered to port %d!", ifDef.Port))
 	}
@@ -39,8 +43,8 @@ func lockAPort() (uint, error) {
 	for _, ins := range runningInstances {
 		runningInsIds = append(runningInsIds, ins.ID)
 	}
-	registeredIfs := []model.InstanceInterface{}
-	if err := db.Db.Where("instance_id IN ?", runningInsIds).Find(&registeredIfs).Error; err != nil {
+	registeredIfs := []model.ServiceInterface{}
+	if err := db.Db.Where("service_id IN ?", runningInsIds).Find(&registeredIfs).Error; err != nil {
 		return 0, err
 	}
 	registeredPortsMap := make(map[uint]interface{})
@@ -55,6 +59,9 @@ func lockAPort() (uint, error) {
 			return false
 		}
 		if _, ok := LockedPortsMap[p]; ok {
+			return false
+		}
+		if !utils.IsPortAvailable(p) {
 			return false
 		}
 		return true

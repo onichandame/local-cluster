@@ -2,10 +2,11 @@ package model
 
 import "gorm.io/gorm"
 
-type InstanceInterface struct {
+type ServiceInterface struct {
 	gorm.Model
-	InstanceID   uint `gorm:"not null"`
-	Port         uint
+	Port         uint `gorm:"not null"`
 	DefinitionID uint `gorm:"not null"`
 	Definition   *ApplicationInterface
+	ServiceID    uint
+	ServiceType  string
 }

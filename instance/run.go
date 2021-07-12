@@ -12,6 +12,7 @@ import (
 	"github.com/onichandame/local-cluster/constants"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
+	"github.com/onichandame/local-cluster/interfaces"
 	"github.com/sirupsen/logrus"
 )
 
@@ -71,10 +72,10 @@ func RunInstance(insDef *model.Instance) error {
 		return err
 	}
 	for _, ifDef := range ifDefs {
-		insIf, err := createInterface(insDef, &ifDef)
-		if err != nil {
+		if err := interfaces.Create(insDef, &ifDef); err != nil {
 			return err
 		}
+		insIf := insDef.Interfaces[len(insDef.Interfaces)-1]
 		if ifDef.PortByEnv != "" {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%d", ifDef.PortByEnv, insIf.Port))
 		}
