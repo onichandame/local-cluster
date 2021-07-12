@@ -38,7 +38,7 @@ var AppAdd = route.Route{
 		if err := db.Db.Create(&app).Error; err != nil {
 			return nil, err
 		}
-		if err := application.AppAdd(&app); err != nil {
+		if err := application.Prepare(&app); err != nil {
 			return nil, err
 		}
 		return &app, nil

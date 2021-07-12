@@ -1,6 +1,7 @@
 package job
 
 import (
+	"github.com/onichandame/local-cluster/application"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/instance_group"
@@ -40,7 +41,7 @@ func getOrCreateApp() (*model.Application, error) {
 			Command:     "npx",
 			Args:        "serve build"},
 	}
-	if err := db.Db.Where("name = ?", app.Name).FirstOrCreate(&app).Error; err != nil {
+	if err := application.Prepare(&app); err != nil {
 		return nil, err
 	}
 	return &app, err
@@ -53,7 +54,7 @@ func getOrCreateInsGrp() (*model.InstanceGroup, error) {
 		return nil, err
 	}
 	ig := model.InstanceGroup{}
-	ig.Replicas = 1
+	ig.Replicas = 2
 	ig.ApplicationID = app.ID
 	if err := db.Db.Where("application_id = ?", ig.ApplicationID).FirstOrCreate(&ig).Error; err != nil {
 		return nil, err
