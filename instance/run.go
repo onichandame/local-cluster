@@ -18,8 +18,8 @@ import (
 
 func RunInstance(insDef *model.Instance) error {
 	// Only one instance can be starting at a moment
-	RMLock.Lock()
-	defer func() { RMLock.Unlock() }()
+	Lock.Lock()
+	defer func() { Lock.Unlock() }()
 	// create instance data if not already
 	var err error
 	if insDef.ID == 0 {
@@ -67,15 +67,17 @@ func RunInstance(insDef *model.Instance) error {
 	cmd.Dir = insDir
 	cmd.Env = append(cmd.Env, parseEnv(insDef)...)
 	// prepare interfaces
-	ifDefs := []model.ApplicationInterface{}
-	if err = db.Db.Where("application_id = ?", app.ID).Find(&ifDefs).Error; err != nil {
+	if err := interfaces.PrepareInterfaces(insDef); err != nil {
 		return err
 	}
-	for _, ifDef := range ifDefs {
-		if err := interfaces.Create(insDef, &ifDef); err != nil {
+	for _, insIf := range insDef.Interfaces {
+		var ifDef model.ApplicationInterface
+		logrus.Info("hi")
+		if err := db.Db.First(&ifDef, insIf.DefinitionID).Error; err != nil {
+			logrus.Error(insIf.DefinitionID)
+			logrus.Error(err)
 			return err
 		}
-		insIf := insDef.Interfaces[len(insDef.Interfaces)-1]
 		if ifDef.PortByEnv != "" {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%d", ifDef.PortByEnv, insIf.Port))
 		}

@@ -11,10 +11,7 @@ import (
 	"github.com/onichandame/local-cluster/pkg/utils"
 )
 
-func Register(ifDef *model.ServiceInterface) error {
-	// mutex lock
-	Lock.Lock()
-	defer func() { Lock.Unlock() }()
+func register(ifDef *model.ServiceInterface) error {
 	if ifDef.Port != 0 {
 		return errors.New(fmt.Sprintf("interface already registered to port %d!", ifDef.Port))
 	}

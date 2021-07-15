@@ -1,6 +1,7 @@
 package constants
 
 type InstanceGroupStatus string
+type UpdateStrategy string
 
 const (
 	INITIALIZING InstanceGroupStatus = "INITIALIZING"

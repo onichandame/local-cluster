@@ -12,4 +12,4 @@ type Runner struct {
 }
 
 var RunnersMap = map[uint]*Runner{}
-var RMLock sync.Mutex
+var Lock sync.Mutex

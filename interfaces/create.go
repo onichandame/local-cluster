@@ -9,16 +9,27 @@ import (
 	"github.com/onichandame/local-cluster/pkg/utils"
 )
 
-func Create(svcDef interface{}, ifDef *model.ApplicationInterface) error {
+func createIF(svcDef interface{}, ifDef *model.ApplicationInterface) error {
 	if insDef, ok := svcDef.(*model.Instance); ok {
 		if insDef.ApplicationID != ifDef.ApplicationID {
 			return errors.New("instance and interface definition must belong to the same application!")
 		}
-		insDef.Interfaces = append(insDef.Interfaces, model.ServiceInterface{ServiceID: insDef.ID, DefinitionID: insDef.ID})
+		insDef.Interfaces = append(insDef.Interfaces, model.ServiceInterface{ServiceID: insDef.ID, DefinitionID: ifDef.ID})
 		if err := db.Db.Save(&insDef).Error; err != nil {
 			return err
 		}
-		if err := Register(&insDef.Interfaces[len(insDef.Interfaces)-1]); err != nil {
+		if err := register(&insDef.Interfaces[len(insDef.Interfaces)-1]); err != nil {
+			return err
+		}
+	} else if igDef, ok := svcDef.(*model.InstanceGroup); ok {
+		if igDef.ApplicationID != ifDef.ApplicationID {
+			return errors.New("instance group and interface definition must belong to the same application!")
+		}
+		igDef.Interfaces = append(igDef.Interfaces, model.ServiceInterface{ServiceID: igDef.ID, DefinitionID: ifDef.ID})
+		if err := db.Db.Save(&igDef).Error; err != nil {
+			return err
+		}
+		if err := register(&igDef.Interfaces[len(igDef.Interfaces)-1]); err != nil {
 			return err
 		}
 	} else {

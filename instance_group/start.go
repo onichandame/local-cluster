@@ -6,6 +6,7 @@ import (
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/instance"
+	"github.com/onichandame/local-cluster/interfaces"
 	"github.com/sirupsen/logrus"
 )
 
@@ -43,6 +44,7 @@ func Start(igDef *model.InstanceGroup) error {
 		}))
 	}
 	p := promise.All(ps...)
+	// instances
 	go func() {
 		if _, err := p.Await(); err == nil {
 			logrus.Infof("%d replicas started", igDef.Replicas)
@@ -53,5 +55,9 @@ func Start(igDef *model.InstanceGroup) error {
 			setInstanceGroupStatus(igDef, constants.READY)
 		}
 	}()
+	// interfaces
+	if err := interfaces.PrepareInterfaces(igDef); err != nil {
+		return err
+	}
 	return nil
 }
