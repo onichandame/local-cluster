@@ -10,10 +10,10 @@ type Conns struct {
 	conns map[net.Conn]interface{}
 }
 
-func newConns() Conns {
+func newConns() *Conns {
 	var m Conns
 	m.conns = make(map[net.Conn]interface{})
-	return m
+	return &m
 }
 
 func (m *Conns) addConn(conn net.Conn) {
@@ -40,13 +40,13 @@ func (m *Conns) listConns() []net.Conn {
 
 type TargetConnMap struct {
 	lock    sync.Mutex
-	targets map[string]Conns
+	targets map[string]*Conns
 }
 
-func newTargetConnMap() TargetConnMap {
+func newTargetConnMap() *TargetConnMap {
 	var m TargetConnMap
-	m.targets = make(map[string]Conns)
-	return m
+	m.targets = make(map[string]*Conns)
+	return &m
 }
 
 func (m *TargetConnMap) initTargets(targets []string) {

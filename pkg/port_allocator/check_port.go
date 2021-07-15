@@ -1,16 +1,14 @@
-package utils
+package portallocator
 
 import (
 	"fmt"
 	"net"
 )
 
-func IsPortAvailable(p uint) bool {
+func checkPort(p uint) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", p))
-	if err == nil {
+	if listener != nil {
 		listener.Close()
-		return true
-	} else {
-		return false
 	}
+	return err
 }

@@ -31,15 +31,15 @@ type Proxy struct {
 	conns          []net.Conn
 	wg             sync.WaitGroup
 	state          int64
-	targetConnMap  TargetConnMap
+	targetConnMap  *TargetConnMap
 	lastUsedTarget string
 }
 
-func New() Proxy {
+func New() *Proxy {
 	var p Proxy
 	p.targetConnMap = newTargetConnMap()
 	p.state = CREATING
-	return p
+	return &p
 }
 
 func (p *Proxy) nextTarget() string {
