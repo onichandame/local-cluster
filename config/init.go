@@ -1,9 +1,11 @@
 package config
 
 import (
+	"errors"
+	"os"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"os"
 )
 
 const (
@@ -20,9 +22,9 @@ type config struct {
 
 var Config config
 
-func ConfigInit() {
+func Init() error {
 	if err := initPresets(); err != nil {
-		logrus.Fatalf("failed to init root directories")
+		return errors.New("failed to init root directories")
 	}
 	viper.SetConfigName(configFilename)
 	systemConfigDir, err := os.UserConfigDir()
@@ -36,6 +38,7 @@ func ConfigInit() {
 		logrus.Warn("no config file is found! The local cluster will start with env variables and default")
 	}
 	initPortRange()
+	return nil
 }
 
 func initPortRange() {

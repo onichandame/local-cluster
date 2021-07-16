@@ -2,21 +2,22 @@ package portallocator
 
 import "errors"
 
-func (a *PortAllocator) nextPort() uint {
-	if a.lastUsed < a.lowerBound || a.lastUsed >= a.upperBound {
+func (a *PortAllocator) nextPort(p uint) uint {
+	p++
+	if p < a.lowerBound || p >= a.upperBound {
 		return a.lowerBound
 	} else {
-		return a.lastUsed + 1
+		return p
 	}
 }
 
 func (a *PortAllocator) Allocate() (uint, error) {
 	a.lock.Lock()
 	defer func() { a.lock.Unlock() }()
-	var port uint
+	var port uint = a.lastUsed
 	var err error
 	tryPort := func(p uint) bool {
-		if p < a.lowerBound || p > a.lowerBound {
+		if p < a.lowerBound || p > a.upperBound {
 			return false
 		}
 		if _, ok := a.ports[p]; ok {
@@ -34,10 +35,10 @@ func (a *PortAllocator) Allocate() (uint, error) {
 			err = errors.New("all ports in use. cannot allocate more!")
 			break
 		}
-		port = a.nextPort()
+		port = a.nextPort(port)
 		trials++
 	}
-	if err != nil {
+	if err == nil {
 		a.ports[port] = nil
 		a.lastUsed = port
 	}

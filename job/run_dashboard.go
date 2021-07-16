@@ -10,7 +10,7 @@ import (
 var runDashboard = job{
 	immediate: true,
 	name:      "RunDashboard",
-	dependsOn: []*job{&auditInstances},
+	dependsOn: []*job{&auditInstances, &initConfig, &initInterfaces, &initProxyManager},
 	run: func() error {
 		ig, err := getOrCreateInsGrp()
 		if err != nil {
@@ -24,8 +24,12 @@ var runDashboard = job{
 }
 
 func getOrCreateApp() (*model.Application, error) {
+	appName := "dashboard"
+	var app model.Application
 	var err error
-	app := model.Application{}
+	if err = db.Db.Where("name = ?", appName).First(&app).Error; err == nil {
+		return &app, err
+	}
 	app.Name = "dashboard"
 	app.Interfaces = []model.ApplicationInterface{
 		{
@@ -41,8 +45,8 @@ func getOrCreateApp() (*model.Application, error) {
 			Command:     "npx",
 			Args:        "serve build"},
 	}
-	if err := application.Prepare(&app); err != nil {
-		return nil, err
+	if err = application.Prepare(&app); err != nil {
+		return &app, err
 	}
 	return &app, err
 }

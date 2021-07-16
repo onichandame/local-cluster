@@ -14,7 +14,7 @@ func createIF(svcDef interface{}, ifDef *model.ApplicationInterface) error {
 		if insDef.ApplicationID != ifDef.ApplicationID {
 			return errors.New("instance and interface definition must belong to the same application!")
 		}
-		insDef.Interfaces = append(insDef.Interfaces, model.ServiceInterface{ServiceID: insDef.ID, DefinitionID: ifDef.ID})
+		insDef.Interfaces = append(insDef.Interfaces, model.ServiceInterface{ServiceID: insDef.ID, Definition: ifDef})
 		if err := db.Db.Save(&insDef).Error; err != nil {
 			return err
 		}
@@ -25,7 +25,7 @@ func createIF(svcDef interface{}, ifDef *model.ApplicationInterface) error {
 		if igDef.ApplicationID != ifDef.ApplicationID {
 			return errors.New("instance group and interface definition must belong to the same application!")
 		}
-		igDef.Interfaces = append(igDef.Interfaces, model.ServiceInterface{ServiceID: igDef.ID, DefinitionID: ifDef.ID})
+		igDef.Interfaces = append(igDef.Interfaces, model.ServiceInterface{ServiceID: igDef.ID, Definition: ifDef})
 		if err := db.Db.Save(&igDef).Error; err != nil {
 			return err
 		}

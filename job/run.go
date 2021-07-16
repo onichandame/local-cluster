@@ -46,7 +46,7 @@ func runJob(j *job) error {
 	if err = j.run(); err == nil {
 		return finalizeRun(run, constants.FINISHED)
 	} else {
-		logrus.Warnf("job %d failed", run.ID)
+		logrus.Warnf("job %s failed", run.Job)
 		logrus.Warn(err)
 		finalizeRun(run, constants.FAILED)
 		if j.fatal {

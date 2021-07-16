@@ -10,7 +10,7 @@ import (
 var jobInitMap = make(map[*job]*promise.Promise)
 
 func JobsInit() {
-	allJobs := []*job{&createAdmin, &runDashboard, &auditInstances}
+	allJobs := []*job{&createAdmin, &runDashboard, &auditInstances, &initInterfaces, &initConfig, &initProxyManager}
 	for _, j := range allJobs {
 		if _, ok := jobInitMap[j]; !ok {
 			initAJob(j)
@@ -31,7 +31,6 @@ func initAJob(j *job) {
 	if _, ok := jobInitMap[j]; ok {
 		return
 	}
-	// check if circular dependency exists
 	logrus.Infof("initializing job %s", j.name)
 	initInterval := func() {
 		duration, err := time.ParseDuration(j.interval)

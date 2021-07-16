@@ -6,6 +6,8 @@ import (
 	"io"
 	"net"
 	"sync/atomic"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Config struct {
@@ -47,16 +49,24 @@ func (p *Proxy) Start() error {
 		}
 		var target net.Conn
 		if target, err = net.Dial("tcp", targetAddr); err != nil {
+			logrus.Error(targetAddr)
 			panic(err)
 		} else {
-			go io.Copy(source, target)
-			io.Copy(target, source)
+			defer func() { target.Close() }()
+			closeChan := make(chan interface{})
+			transmitData := func(writer io.Writer, reader io.Reader) {
+				io.Copy(writer, reader)
+				closeChan <- nil
+			}
+			go transmitData(target, source)
+			go transmitData(source, target)
+			<-closeChan
 		}
 	}
 	go func() {
 		for {
 			if conn, err := p.listener.Accept(); err != nil {
-				panic(err)
+				break
 			} else {
 				if p.state != RUNNING {
 					conn.Write([]byte("cannot handle new requests when proxy is not ready"))

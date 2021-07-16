@@ -8,18 +8,14 @@ import (
 )
 
 func PrepareInterfaces(svcDef interface{}) error {
-	// mutex lock
-	Lock.Lock()
-	defer func() { Lock.Unlock() }()
 	if insDef, ok := svcDef.(*model.Instance); ok {
 		if len(insDef.Interfaces) > 0 {
 			return errors.New("interfaces already prepared!")
 		}
-		ifDefs := []model.ApplicationInterface{}
-		if err := db.Db.Where("application_id = ?", insDef.ApplicationID).Find(&ifDefs).Error; err != nil {
+		if err := db.Db.Preload("Application.Interfaces").First(insDef, insDef.ID).Error; err != nil {
 			return err
 		}
-		for _, ifDef := range ifDefs {
+		for _, ifDef := range insDef.Application.Interfaces {
 			if err := createIF(insDef, &ifDef); err != nil {
 				return err
 			}
@@ -28,11 +24,10 @@ func PrepareInterfaces(svcDef interface{}) error {
 		if len(igDef.Interfaces) > 0 {
 			return errors.New("interfaces already prepared!")
 		}
-		ifDefs := []model.ApplicationInterface{}
-		if err := db.Db.Where("application_id = ?", igDef.ApplicationID).Find(&ifDefs).Error; err != nil {
+		if err := db.Db.Preload("Application.Interfaces").First(igDef, igDef.ID).Error; err != nil {
 			return err
 		}
-		for _, ifDef := range ifDefs {
+		for _, ifDef := range igDef.Application.Interfaces {
 			if err := createIF(igDef, &ifDef); err != nil {
 				return err
 			}
