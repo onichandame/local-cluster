@@ -10,7 +10,7 @@ import (
 var jobInitMap = make(map[*job]*promise.Promise)
 
 func JobsInit() {
-	allJobs := []*job{&createAdmin, &runDashboard, &auditInstances, &initInterfaces, &initConfig, &initProxyManager}
+	allJobs := []*job{&createAdmin, &runDashboard, &auditInstances, &initInterfaces, &initConfig, &initProxyManager, &initCacheManager}
 	for _, j := range allJobs {
 		if _, ok := jobInitMap[j]; !ok {
 			initAJob(j)

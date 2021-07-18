@@ -1,6 +1,7 @@
 package application
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,12 +18,21 @@ const (
 	tmpPrefix = "tmp-"
 )
 
-type CacheStateMap struct {
-	lock     sync.Mutex
-	stateMap map[uint]*promise.Promise
+type CacheManager struct {
+	lock   sync.Mutex
+	caches map[uint]*promise.Promise
 }
 
-var cacheStateMap CacheStateMap
+var manager *CacheManager
+
+func InitCache() error {
+	if manager != nil {
+		return errors.New("cannot re-init cache manager")
+	}
+	manager = new(CacheManager)
+	manager.caches = make(map[uint]*promise.Promise)
+	return nil
+}
 
 func PrepareCache(appDef *model.Application) error {
 	cachePath := GetCachePath(appDef)
@@ -31,11 +41,8 @@ func PrepareCache(appDef *model.Application) error {
 		return err
 	}
 	// only one routine can manipulate the map at a moment
-	cacheStateMap.lock.Lock()
-	defer func() { cacheStateMap.lock.Unlock() }()
-	if cacheStateMap.stateMap == nil {
-		cacheStateMap.stateMap = make(map[uint]*promise.Promise)
-	}
+	manager.lock.Lock()
+	defer func() { manager.lock.Unlock() }()
 	// check if another process is caching or it is already cached
 	if utils.PathExists(cachePath) {
 		if spec.Hash != "" {
@@ -48,11 +55,11 @@ func PrepareCache(appDef *model.Application) error {
 		}
 		return nil
 	}
-	if p, ok := cacheStateMap.stateMap[appDef.ID]; ok {
+	if p, ok := manager.caches[appDef.ID]; ok {
 		_, err := p.Await()
 		return err
 	}
-	cacheStateMap.stateMap[appDef.ID] = promise.New(func(resolve func(promise.Any), reject func(error)) {
+	manager.caches[appDef.ID] = promise.New(func(resolve func(promise.Any), reject func(error)) {
 		logrus.Infof("downloading cache for app %s", appDef.Name)
 		tmpFilePath := newTmpFilePath()
 		if err := utils.Download(spec.DownloadUrl, tmpFilePath); err != nil {
@@ -64,17 +71,18 @@ func PrepareCache(appDef *model.Application) error {
 			}
 		}
 		logrus.Infof("downloaded cache for app %s", appDef.Name)
-		delete(cacheStateMap.stateMap, appDef.ID)
+		delete(manager.caches, appDef.ID)
 		if err := os.Rename(tmpFilePath, cachePath); err != nil {
 			reject(err)
 		}
 		resolve(nil)
 	})
+	manager.caches[appDef.ID].Await()
 	return nil
 }
 
 func WaitCache(appDef *model.Application) error {
-	if p, ok := cacheStateMap.stateMap[appDef.ID]; ok {
+	if p, ok := manager.caches[appDef.ID]; ok {
 		_, err := p.Await()
 		return err
 	}

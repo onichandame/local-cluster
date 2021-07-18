@@ -10,7 +10,7 @@ import (
 var runDashboard = job{
 	immediate: true,
 	name:      "RunDashboard",
-	dependsOn: []*job{&auditInstances, &initConfig, &initInterfaces, &initProxyManager},
+	dependsOn: []*job{&auditInstances, &initConfig, &initInterfaces, &initProxyManager, &initCacheManager},
 	run: func() error {
 		ig, err := getOrCreateInsGrp()
 		if err != nil {
