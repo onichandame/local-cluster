@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/onichandame/local-cluster/application"
+	"github.com/onichandame/local-cluster/config"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/instance"
 	"github.com/onichandame/local-cluster/job"
@@ -18,7 +19,8 @@ func main() {
 }
 
 func preBootstrap() {
-	db.DBInit()
+	config.Init()
+	db.Init()
 	job.JobsInit()
 	if err := application.AuditCache(); err != nil {
 		panic(err)

@@ -10,7 +10,7 @@ import (
 var jobInitMap = make(map[*job]*promise.Promise)
 
 func JobsInit() {
-	allJobs := []*job{&createAdmin, &runDashboard, &auditInstances, &initInterfaces, &initConfig, &initProxyManager, &initCacheManager}
+	allJobs := []*job{&createAdmin, &runDashboard, &auditInstances, &initInterfaces, &initProxyManager, &initCacheManager}
 	for _, j := range allJobs {
 		if _, ok := jobInitMap[j]; !ok {
 			initAJob(j)
@@ -45,12 +45,17 @@ func initAJob(j *job) {
 			}
 		}
 	}
+	for _, dep := range j.dependsOn {
+		initAJob(dep)
+	}
 	jobInitMap[j] = promise.New(func(resolve func(promise.Any), reject func(error)) {
+		depPs := []*promise.Promise{}
 		for _, dep := range j.dependsOn {
-			initAJob(dep)
-			if _, err := jobInitMap[dep].Await(); err != nil {
-				panic(err)
-			}
+			depPs = append(depPs, jobInitMap[dep])
+		}
+		if _, err := promise.All(depPs...).Await(); err != nil {
+			reject(err)
+			return
 		}
 		if j.interval != "" {
 			go initInterval()

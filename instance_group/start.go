@@ -55,27 +55,26 @@ func Start(igDef *model.InstanceGroup) error {
 			logrus.Error(err)
 			setInstanceGroupStatus(igDef, constants.READY)
 		}
-	}()
-	// interfaces
-	if err := interfaces.PrepareInterfaces(igDef); err != nil {
-		return err
-	}
-	if err := db.Db.Preload("Instances.Interfaces").First(igDef, igDef.ID).Error; err != nil {
-		return err
-	}
-	for _, igIf := range igDef.Interfaces {
-		logrus.Error(igIf.Port)
-		insPorts := []uint{}
-		for _, ins := range igDef.Instances {
-			for _, insIf := range ins.Interfaces {
-				if insIf.DefinitionID == igIf.DefinitionID {
-					insPorts = append(insPorts, insIf.Port)
+		// interfaces
+		if err := interfaces.PrepareInterfaces(igDef); err != nil {
+			panic(err)
+		}
+		if err := db.Db.Preload("Instances", "Status = ?", constants.RUNNING).Preload("Instances.Interfaces").First(igDef, igDef.ID).Error; err != nil {
+			panic(err)
+		}
+		for _, igIf := range igDef.Interfaces {
+			insPorts := make([]uint, 0)
+			for _, ins := range igDef.Instances {
+				for _, insIf := range ins.Interfaces {
+					if insIf.DefinitionID == igIf.DefinitionID {
+						insPorts = append(insPorts, insIf.Port)
+					}
 				}
 			}
+			if err := proxy.Create(igIf.Port, insPorts); err != nil {
+				panic(err)
+			}
 		}
-		if err := proxy.Create(igIf.Port, insPorts); err != nil {
-			return err
-		}
-	}
+	}()
 	return nil
 }

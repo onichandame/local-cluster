@@ -14,6 +14,12 @@ import (
 var errJobAlreadyRun = errors.New(fmt.Sprintf("job already created by another runner"))
 
 func runJob(j *job) error {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorf("failed to run job %s", j.name)
+			panic(err)
+		}
+	}()
 	if j.totalRuns != 0 {
 		if runs, err := countRuns(struct {
 			job     string

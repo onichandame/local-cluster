@@ -10,7 +10,6 @@ import (
 )
 
 var createAdmin = job{
-	interval:       "1m",
 	name:           "CreateAdmin",
 	fatal:          true,
 	immediate:      true,

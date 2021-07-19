@@ -55,9 +55,8 @@ func PrepareCache(appDef *model.Application) error {
 		}
 		return nil
 	}
-	if p, ok := manager.caches[appDef.ID]; ok {
-		_, err := p.Await()
-		return err
+	if _, ok := manager.caches[appDef.ID]; ok {
+		return nil
 	}
 	manager.caches[appDef.ID] = promise.New(func(resolve func(promise.Any), reject func(error)) {
 		logrus.Infof("downloading cache for app %s", appDef.Name)
@@ -77,7 +76,6 @@ func PrepareCache(appDef *model.Application) error {
 		}
 		resolve(nil)
 	})
-	manager.caches[appDef.ID].Await()
 	return nil
 }
 
@@ -90,7 +88,7 @@ func WaitCache(appDef *model.Application) error {
 }
 
 func AuditCache() error {
-	pattern := filepath.Join(config.ConfigPresets.CacheDir, tmpPrefix+"*")
+	pattern := filepath.Join(config.Config.Path.Cache, tmpPrefix+"*")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return err
@@ -108,5 +106,5 @@ func newTmpFilePath() string {
 	if err != nil {
 		panic(err)
 	}
-	return filepath.Join(config.ConfigPresets.CacheDir, tmpPrefix+salt.String())
+	return filepath.Join(config.Config.Path.Cache, tmpPrefix+salt.String())
 }

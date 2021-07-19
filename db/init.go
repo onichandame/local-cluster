@@ -14,19 +14,20 @@ import (
 
 var Db *gorm.DB
 
-func DBInit() {
-	dbDir := config.ConfigPresets.DbDir
+func Init() error {
+	dbDir := config.Config.Path.DB
 	dbPath := filepath.Join(dbDir, "core.sqlite")
+	logrus.Infof("opening or creating db at %s", dbPath)
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
-		panic("failed to open core database")
+		return err
 	}
 	Db = db
 
-	loadModels()
+	return loadModels()
 }
 
-func loadModels() {
+func loadModels() error {
 	loadAModel := func(model interface{}) {
 		if err := Db.AutoMigrate(model); err != nil {
 			logrus.Error(err)
@@ -44,6 +45,7 @@ func loadModels() {
 		&model.ApplicationSpec{},
 		&model.ApplicationInterface{},
 		&model.ServiceInterface{},
+		&model.Entrance{},
 		&model.Application{},
 		&model.Instance{},
 		&model.InstanceGroup{},
@@ -51,4 +53,5 @@ func loadModels() {
 	for _, m := range models {
 		loadAModel(m)
 	}
+	return nil
 }

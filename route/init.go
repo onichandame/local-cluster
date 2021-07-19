@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/onichandame/local-cluster/pkg/route"
 	"github.com/onichandame/local-cluster/route/app"
+	"github.com/onichandame/local-cluster/route/entrance"
 	"github.com/onichandame/local-cluster/route/instance"
 )
 
@@ -12,7 +13,7 @@ func RoutesInit(e *gin.Engine) {
 
 	rootRoute := route.Route{
 		Endpoint:  "",
-		Subroutes: []*route.Route{&RouteHealthCheck, &app.AppRoot, &instance.InstanceRoot},
+		Subroutes: []*route.Route{&RouteHealthCheck, &app.AppRoot, &instance.InstanceRoot, &entrance.Entrances},
 	}
 
 	route.Bootstrap(&rootRoute, root)

@@ -40,7 +40,7 @@ func Audit() error {
 		ins := model.Instance{}
 		if err := db.Db.Where("id = ? AND status IN ?", id, []constants.InstanceStatus{constants.CREATING, constants.RUNNING, constants.TERMINATING}).First(&ins).Error; err != nil {
 			logrus.Warnf("cannot find active instance for runtime %d. deleting it", id)
-			if err := os.RemoveAll(filepath.Join(config.ConfigPresets.InstancesDir, runtime)); err != nil {
+			if err := os.RemoveAll(filepath.Join(config.Config.Path.Instances, runtime)); err != nil {
 				logrus.Warnf("failed to delete unused runtime %d", id)
 			}
 		}
@@ -63,7 +63,7 @@ func Audit() error {
 
 func listRuntimes() ([]string, error) {
 	res := []string{}
-	items, err := ioutil.ReadDir(config.ConfigPresets.InstancesDir)
+	items, err := ioutil.ReadDir(config.Config.Path.Instances)
 	if err != nil {
 		return res, err
 	}

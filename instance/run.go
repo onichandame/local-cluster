@@ -52,6 +52,10 @@ func RunInstance(insDef *model.Instance) error {
 	if err = application.PrepareCache(&app); err != nil {
 		return err
 	}
+	if err = application.WaitCache(&app); err != nil {
+		return err
+	}
+	application.WaitCache(&app)
 	if err = prepareRuntime(insDef); err != nil {
 		return err
 	}
@@ -72,7 +76,6 @@ func RunInstance(insDef *model.Instance) error {
 	}
 	for _, insIf := range insDef.Interfaces {
 		var ifDef model.ApplicationInterface
-		logrus.Info("hi")
 		if err := db.Db.First(&ifDef, insIf.DefinitionID).Error; err != nil {
 			logrus.Error(insIf.DefinitionID)
 			logrus.Error(err)

@@ -10,7 +10,7 @@ import (
 var runDashboard = job{
 	immediate: true,
 	name:      "RunDashboard",
-	dependsOn: []*job{&auditInstances, &initConfig, &initInterfaces, &initProxyManager, &initCacheManager},
+	dependsOn: []*job{&auditInstances, &initInterfaces, &initProxyManager, &initCacheManager},
 	run: func() error {
 		ig, err := getOrCreateInsGrp()
 		if err != nil {
@@ -43,7 +43,7 @@ func getOrCreateApp() (*model.Application, error) {
 			Platform:    "linux",
 			Arch:        "amd64",
 			Command:     "npx",
-			Args:        "serve build"},
+			Args:        "serve -s build"},
 	}
 	if err = application.Prepare(&app); err != nil {
 		return &app, err

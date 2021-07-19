@@ -6,7 +6,7 @@ var auditInstances = job{
 	name:      "AuditInstances",
 	immediate: true,
 	blocking:  true,
-	dependsOn: []*job{&initConfig},
+	fatal:     true,
 	run: func() error {
 		return instance.Audit()
 	},

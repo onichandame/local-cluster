@@ -9,5 +9,5 @@ import (
 )
 
 func getInsDir(insDef *model.Instance) string {
-	return filepath.Join(config.ConfigPresets.InstancesDir, strconv.Itoa(int(insDef.ID)))
+	return filepath.Join(config.Config.Path.Instances, strconv.Itoa(int(insDef.ID)))
 }

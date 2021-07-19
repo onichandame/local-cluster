@@ -9,6 +9,7 @@ const (
 	POST   = iota
 	PUT    = iota
 	DELETE = iota
+	ANY    = iota
 )
 
 type Route struct {

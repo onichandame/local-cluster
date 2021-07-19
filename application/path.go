@@ -9,5 +9,5 @@ import (
 )
 
 func GetCachePath(appDef *model.Application) string {
-	return filepath.Join(config.ConfigPresets.CacheDir, strconv.Itoa(int(appDef.ID)))
+	return filepath.Join(config.Config.Path.Cache, strconv.Itoa(int(appDef.ID)))
 }

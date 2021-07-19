@@ -56,7 +56,6 @@ func (p *Proxy) nextTarget() string {
 		for _, t := range p.Targets {
 			if hitLastUsed {
 				target = t
-				p.lastUsedTarget = t
 				break
 			} else if t == p.lastUsedTarget {
 				hitLastUsed = true
@@ -69,5 +68,6 @@ func (p *Proxy) nextTarget() string {
 			panic("failed to select a target for proxy")
 		}
 	}
+	p.lastUsedTarget = target
 	return target
 }

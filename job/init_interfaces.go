@@ -10,7 +10,6 @@ var initInterfaces = job{
 	immediate: true,
 	fatal:     true,
 	blocking:  true,
-	dependsOn: []*job{&initConfig},
 	run: func() error {
 		return interfaces.Init(config.Config.PortRange.StartAt, config.Config.PortRange.EndAt)
 	},

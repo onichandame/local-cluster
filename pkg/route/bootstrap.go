@@ -47,6 +47,10 @@ func Bootstrap(r *Route, g *gin.RouterGroup) {
 			group.PUT("", handleRequest())
 		case DELETE:
 			group.DELETE("", handleRequest())
+		case ANY:
+			fallthrough
+		default:
+			group.Any("", handleRequest())
 		}
 	}
 	for _, sub := range r.Subroutes {

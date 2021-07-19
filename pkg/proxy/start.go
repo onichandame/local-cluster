@@ -29,6 +29,7 @@ func (p *Proxy) Start() error {
 			panic(fmt.Sprintf("proxy state changed before Start action finished! must have been a race condition!"))
 		}
 	}()
+
 	if ok := atomic.CompareAndSwapInt64(&p.state, CREATING, STARTING); !ok {
 		return errors.New("proxy already started or terminated cannot be started again!")
 	}
