@@ -1,25 +1,43 @@
 package job
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/onichandame/local-cluster/application"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/instance_group"
 )
 
+const (
+	interfaceName = "main"
+)
+
 var runDashboard = job{
 	immediate: true,
 	name:      "RunDashboard",
-	dependsOn: []*job{&auditInstances, &initInterfaces, &initProxyManager, &initCacheManager},
-	run: func() error {
-		ig, err := getOrCreateInsGrp()
-		if err != nil {
-			return err
+	dependsOn: []*job{&auditInstances, &initInterfaces, &initProxyManager, &initCacheManager, &auditEntrances},
+	run: func() (err error) {
+		err = nil
+		defer func() {
+			if er := recover(); er != nil {
+				if e, ok := er.(error); ok {
+					err = e
+				}
+			}
+		}()
+		if ig, err := getOrCreateInsGrp(); err != nil {
+			panic(err)
+		} else {
+			if err := instancegroup.Start(ig); err != nil {
+				panic(err)
+			}
+			if err := createEntrance(ig); err != nil {
+				panic(err)
+			}
 		}
-		if err := instancegroup.Start(ig); err != nil {
-			return err
-		}
-		return nil
+		return err
 	},
 }
 
@@ -33,7 +51,7 @@ func getOrCreateApp() (*model.Application, error) {
 	app.Name = "dashboard"
 	app.Interfaces = []model.ApplicationInterface{
 		{
-			Name:      "main",
+			Name:      interfaceName,
 			PortByEnv: "PORT",
 		},
 	}
@@ -64,4 +82,34 @@ func getOrCreateInsGrp() (*model.InstanceGroup, error) {
 		return nil, err
 	}
 	return &ig, err
+}
+
+func createEntrance(igDef *model.InstanceGroup) (err error) {
+	err = nil
+	defer func() {
+		if e := recover(); e != nil {
+			if er, ok := e.(error); ok {
+				err = er
+			}
+		}
+	}()
+	ent := new(model.Entrance)
+	if err = db.Db.Preload("Interfaces.Definition").First(igDef, igDef.ID).Error; err != nil {
+		panic(err)
+	}
+	var igIf model.ServiceInterface
+	for _, i := range igDef.Interfaces {
+		if i.Definition.Name == interfaceName {
+			igIf = i
+		}
+	}
+	if igIf.ID == 0 {
+		panic(errors.New(fmt.Sprintf("failed to find interface for dashboard! cannot create entrance")))
+	}
+	ent.Backend = igIf
+	ent.Name = "dashboard"
+	if err = db.Db.Create(ent).Error; err != nil {
+		panic(err)
+	}
+	return err
 }

@@ -41,6 +41,13 @@ func (p *Proxy) Start() error {
 	}
 	p.wg.Add(1)
 	handleRequest := func(source net.Conn) {
+		defer func() {
+			if err := recover(); err != nil {
+				if er, ok := err.(error); ok {
+					logrus.Warn(er)
+				}
+			}
+		}()
 		p.wg.Add(1)
 		defer func() { p.wg.Done() }()
 		defer func() { source.Close() }()

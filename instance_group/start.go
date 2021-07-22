@@ -46,35 +46,33 @@ func Start(igDef *model.InstanceGroup) error {
 	}
 	p := promise.All(ps...)
 	// instances
-	go func() {
-		if _, err := p.Await(); err == nil {
-			logrus.Infof("%d replicas started", igDef.Replicas)
-			setInstanceGroupStatus(igDef, constants.NOTREADY)
-		} else {
-			logrus.Error("failed to start replicas")
-			logrus.Error(err)
-			setInstanceGroupStatus(igDef, constants.READY)
-		}
-		// interfaces
-		if err := interfaces.PrepareInterfaces(igDef); err != nil {
-			panic(err)
-		}
-		if err := db.Db.Preload("Instances", "Status = ?", constants.RUNNING).Preload("Instances.Interfaces").First(igDef, igDef.ID).Error; err != nil {
-			panic(err)
-		}
-		for _, igIf := range igDef.Interfaces {
-			insPorts := make([]uint, 0)
-			for _, ins := range igDef.Instances {
-				for _, insIf := range ins.Interfaces {
-					if insIf.DefinitionID == igIf.DefinitionID {
-						insPorts = append(insPorts, insIf.Port)
-					}
+	if _, err := p.Await(); err == nil {
+		logrus.Infof("%d replicas started", igDef.Replicas)
+		setInstanceGroupStatus(igDef, constants.NOTREADY)
+	} else {
+		logrus.Error("failed to start replicas")
+		logrus.Error(err)
+		setInstanceGroupStatus(igDef, constants.READY)
+	}
+	// interfaces
+	if err := interfaces.PrepareInterfaces(igDef); err != nil {
+		panic(err)
+	}
+	if err := db.Db.Preload("Instances", "Status = ?", constants.RUNNING).Preload("Instances.Interfaces").First(igDef, igDef.ID).Error; err != nil {
+		panic(err)
+	}
+	for _, igIf := range igDef.Interfaces {
+		insPorts := make([]uint, 0)
+		for _, ins := range igDef.Instances {
+			for _, insIf := range ins.Interfaces {
+				if insIf.DefinitionID == igIf.DefinitionID {
+					insPorts = append(insPorts, insIf.Port)
 				}
 			}
-			if err := proxy.Create(igIf.Port, insPorts); err != nil {
-				panic(err)
-			}
 		}
-	}()
+		if err := proxy.Create(igIf.Port, insPorts); err != nil {
+			panic(err)
+		}
+	}
 	return nil
 }

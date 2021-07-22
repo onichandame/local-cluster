@@ -4,7 +4,7 @@ import "gorm.io/gorm"
 
 type Entrance struct {
 	gorm.Model
-	Root      string `gorm:"unique"`
+	Name      string `gorm:"unique"`
 	BackendID uint
 	Backend   ServiceInterface
 }

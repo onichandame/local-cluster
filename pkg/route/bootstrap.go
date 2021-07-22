@@ -17,24 +17,26 @@ func Bootstrap(r *Route, g *gin.RouterGroup) {
 				c.JSON(code, gin.H{"message": err.Error()})
 				return
 			}
-			var body []byte
-			var contentType string
-			if r, ok := res.([]byte); ok {
-				body = r
-				contentType = "text/plain"
-			} else if r, ok := res.(string); ok {
-				body = []byte(r)
-				contentType = "text/plain"
-			} else {
-				logrus.Info(res)
-				if body, err = json.Marshal(res); err != nil {
-					c.JSON(500, gin.H{"message": err.Error()})
-					return
+			if res != nil {
+				var body []byte
+				var contentType string
+				if r, ok := res.([]byte); ok {
+					body = r
+					contentType = "text/plain"
+				} else if r, ok := res.(string); ok {
+					body = []byte(r)
+					contentType = "text/plain"
+				} else {
+					logrus.Info(res)
+					if body, err = json.Marshal(res); err != nil {
+						c.JSON(500, gin.H{"message": err.Error()})
+						return
+					}
+					logrus.Info(body)
+					contentType = "application/json"
 				}
-				logrus.Info(body)
-				contentType = "application/json"
+				c.Data(200, contentType, body)
 			}
-			c.Data(200, contentType, body)
 		}
 	}
 	if r.Handler != nil {
