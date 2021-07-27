@@ -45,6 +45,9 @@ func loadModels() error {
 		&model.ApplicationSpec{},
 		&model.ApplicationInterface{},
 		&model.ServiceInterface{},
+
+		&model.Gateway{},
+
 		&model.Entrance{},
 		&model.Application{},
 		&model.Instance{},

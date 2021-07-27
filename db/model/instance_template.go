@@ -10,6 +10,8 @@ type InstanceTemplate struct {
 	InstanceGroupID uint
 	ApplicationID   uint
 	Application     Application
+	ServiceID       uint `gorm:"not null"`
+	Service         Service
 	RestartPolicy   constants.InstanceRestartPolicy
 	Env             string
 }

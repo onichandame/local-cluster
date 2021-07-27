@@ -36,8 +36,7 @@ func InitCache() error {
 
 func PrepareCache(appDef *model.Application) error {
 	cachePath := GetCachePath(appDef)
-	spec, err := GetSpec(appDef)
-	if err != nil {
+	if err := GetSpec(appDef); err != nil {
 		return err
 	}
 	// only one routine can manipulate the map at a moment
@@ -45,8 +44,8 @@ func PrepareCache(appDef *model.Application) error {
 	defer func() { manager.lock.Unlock() }()
 	// check if another process is caching or it is already cached
 	if utils.PathExists(cachePath) {
-		if spec.Hash != "" {
-			if err := utils.CheckFileHash(cachePath, spec.Hash); err != nil {
+		if appDef.Specs[0].Hash != "" {
+			if err := utils.CheckFileHash(cachePath, appDef.Specs[0].Hash); err != nil {
 				logrus.Infof("cache for app %d is broken! will delete it", appDef.ID)
 				if err := os.Remove(cachePath); err != nil {
 					return err
@@ -61,11 +60,11 @@ func PrepareCache(appDef *model.Application) error {
 	manager.caches[appDef.ID] = promise.New(func(resolve func(promise.Any), reject func(error)) {
 		logrus.Infof("downloading cache for app %s", appDef.Name)
 		tmpFilePath := newTmpFilePath()
-		if err := utils.Download(spec.DownloadUrl, tmpFilePath); err != nil {
+		if err := utils.Download(appDef.Specs[0].DownloadUrl, tmpFilePath); err != nil {
 			reject(err)
 		}
-		if spec.Hash != "" {
-			if err := utils.CheckFileHash(tmpFilePath, spec.Hash); err != nil {
+		if appDef.Specs[0].Hash != "" {
+			if err := utils.CheckFileHash(tmpFilePath, appDef.Specs[0].Hash); err != nil {
 				reject(err)
 			}
 		}

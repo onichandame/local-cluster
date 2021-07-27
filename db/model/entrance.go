@@ -6,5 +6,5 @@ type Entrance struct {
 	gorm.Model
 	Name      string `gorm:"unique"`
 	BackendID uint
-	Backend   ServiceInterface
+	Backend   Gateway
 }

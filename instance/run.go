@@ -13,26 +13,26 @@ import (
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/interfaces"
+	"github.com/onichandame/local-cluster/pkg/utils"
 	"github.com/sirupsen/logrus"
 )
 
-func RunInstance(insDef *model.Instance) error {
+func RunInstance(insDef *model.Instance) (err error) {
+	defer utils.RecoverFromError(&err)
 	// Only one instance can be starting at a moment
 	Lock.Lock()
 	defer func() { Lock.Unlock() }()
-	// create instance data if not already
-	var err error
-	if insDef.ID == 0 {
-		if err = initInstance(insDef); err != nil {
-			return err
-		}
-	}
 	// if running do not run again
-	if insDef.Status == constants.RUNNING {
-		return errors.New(fmt.Sprintf("instance %d already running! If it is not, run audit instead", insDef.ID))
+	switch insDef.Status {
+	case constants.CREATING, constants.CRASHED, constants.TERMINATED:
+		// allowed states before run
+	default:
+		panic(errors.New(fmt.Sprintf("instance %d already running! If it is not, audit first", insDef.ID)))
 	}
 	// prepare runtime directory
-	setInstanceState(insDef, constants.CREATING)
+	if err := setInstanceState(insDef, constants.CREATING); err != nil {
+		panic(err)
+	}
 	defer func() {
 		var finalState constants.InstanceStatus
 		if err == nil {
@@ -45,28 +45,25 @@ func RunInstance(insDef *model.Instance) error {
 		}
 		setInstanceState(insDef, finalState)
 	}()
-	app := model.Application{}
-	if err = db.Db.First(&app, insDef.ApplicationID).Error; err != nil {
-		return err
+	if err = db.Db.Preload("Application").First(&insDef, insDef.ID).Error; err != nil {
+		panic(err)
 	}
-	if err = application.PrepareCache(&app); err != nil {
-		return err
+	if err = application.PrepareCache(&insDef.Application); err != nil {
+		panic(err)
 	}
-	if err = application.WaitCache(&app); err != nil {
-		return err
+	if err = application.WaitCache(&insDef.Application); err != nil {
+		panic(err)
 	}
-	application.WaitCache(&app)
 	if err = prepareRuntime(insDef); err != nil {
-		return err
+		panic(err)
 	}
 	// prepare the cmd context
 	insDir := getInsDir(insDef)
-	spec, err := application.GetSpec(&app)
-	if err != nil {
-		return err
+	if err = application.GetSpec(&insDef.Application); err != nil {
+		panic(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, spec.Command, strings.Split(spec.Args, " ")...)
+	cmd := exec.CommandContext(ctx, insDef.Application.Specs[0].Command, strings.Split(insDef.Application.Specs[0].Args, " ")...)
 	RunnersMap[insDef.ID] = &Runner{cmd: cmd, cancel: cancel}
 	cmd.Dir = insDir
 	cmd.Env = append(cmd.Env, parseEnv(insDef)...)

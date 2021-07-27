@@ -8,5 +8,5 @@ type ServiceInterface struct {
 	DefinitionID uint `gorm:"not null"`
 	Definition   *ApplicationInterface
 	ServiceID    uint
-	ServiceType  string
+	Service      Service
 }
