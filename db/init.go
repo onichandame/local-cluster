@@ -44,8 +44,8 @@ func loadModels() error {
 		&model.JobRecord{},
 		&model.ApplicationSpec{},
 		&model.ApplicationInterface{},
-		&model.ServiceInterface{},
 
+		&model.InstanceInterface{},
 		&model.Gateway{},
 
 		&model.Entrance{},

@@ -6,18 +6,20 @@ import (
 
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
+	"github.com/onichandame/local-cluster/pkg/utils"
 )
 
-func register(ifDef *model.ServiceInterface) error {
+func register(ifDef *model.InstanceInterface) (err error) {
+	defer utils.RecoverFromError(&err)
 	if ifDef.Port != 0 {
-		return errors.New(fmt.Sprintf("interface already registered to port %d!", ifDef.Port))
+		panic(errors.New(fmt.Sprintf("interface already registered to port %d!", ifDef.Port)))
 	}
-	port, err := portAllocator.Allocate()
-	if err != nil {
-		return err
+	if port, err := portAllocator.Allocate(); err != nil {
+		panic(err)
+	} else {
+		if err = db.Db.Model(ifDef).Update("port", port).Error; err != nil {
+			panic(err)
+		}
 	}
-	if err := db.Db.Model(ifDef).Update("port", port).Error; err != nil {
-		return err
-	}
-	return nil
+	return err
 }

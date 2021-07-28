@@ -10,24 +10,25 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func prepareRuntime(insDef *model.Instance) error {
-	insDir := getInsDir(insDef)
+func prepareRuntime(insDef *model.Instance) (err error) {
+	defer utils.RecoverFromError(&err)
+	insDir := getInsRuntimeDir(insDef.ID)
 	if utils.PathExists(insDir) {
 		logrus.Warnf("clearing old runtime for instance %d", insDef.ID)
 		os.RemoveAll(insDir)
 	}
 	app := model.Application{}
-	if err := db.Db.First(&app, insDef.ApplicationID).Error; err != nil {
-		return err
+	if err = db.Db.First(&app, insDef.ApplicationID).Error; err != nil {
+		panic(err)
 	}
 	cachePath := application.GetCachePath(&app)
 	if !utils.PathExists(insDir) {
-		if err := os.Mkdir(insDir, os.ModeDir); err != nil {
-			return err
+		if err = os.Mkdir(insDir, os.ModeDir); err != nil {
+			panic(err)
 		}
 	}
-	if err := utils.DecompressTarGZ(cachePath, insDir); err != nil {
-		return err
+	if err = utils.DecompressTarGZ(cachePath, insDir); err != nil {
+		panic(err)
 	}
-	return nil
+	return err
 }

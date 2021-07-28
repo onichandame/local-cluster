@@ -18,10 +18,12 @@ func UintSliceToIfSlice(raw []uint) []interface{} {
 	return res
 }
 
-func StrToUint(raw string) (uint, error) {
+func StrToUint(raw string) (u uint, err error) {
+	defer RecoverFromError(&err)
 	if i, err := strconv.Atoi(raw); err == nil {
-		return uint(i), nil
+		u = uint(i)
 	} else {
-		return 0, err
+		panic(err)
 	}
+	return u, err
 }

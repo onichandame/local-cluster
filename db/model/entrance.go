@@ -4,7 +4,7 @@ import "gorm.io/gorm"
 
 type Entrance struct {
 	gorm.Model
-	Name      string `gorm:"unique"`
+	Selectable
 	BackendID uint
 	Backend   Gateway
 }

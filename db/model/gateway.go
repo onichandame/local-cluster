@@ -4,10 +4,7 @@ import "gorm.io/gorm"
 
 type Gateway struct {
 	gorm.Model
-	Name        string `gorm:"unique"`
+	Selectable
 	Port        uint   `gorm:"not null"`
-	ServiceID   uint
-	Service     Service
-	InterfaceID uint
-	Interface   ApplicationInterface
+	ServiceName string `gorm:"not null"`
 }
