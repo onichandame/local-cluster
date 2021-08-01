@@ -1,32 +1,34 @@
 package instance
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/onichandame/local-cluster/constants"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
-	"github.com/onichandame/local-cluster/interfaces"
-	"github.com/onichandame/local-cluster/proxy"
+	"github.com/onichandame/local-cluster/pkg/utils"
 )
 
-func Terminate(insDef *model.Instance) error {
-	if err := setInstanceState(insDef, constants.TERMINATING); err != nil {
+func Terminate(insDef *model.Instance) (err error) {
+	defer utils.RecoverFromError(&err)
+	manager := getRunnerManager()
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
+	if err = db.Db.First(insDef, insDef.ID).Error; err != nil {
+		panic(err)
+	}
+	if insDef.Status != constants.RUNNING {
+		panic(errors.New(fmt.Sprintf("cannot terminate instance in state %s", insDef.Status)))
+	}
+	if err = setInstanceState(insDef, constants.TERMINATING); err != nil {
 		return err
 	}
-	if runner, ok := RunnersMap[insDef.ID]; ok {
-		runner.cancel()
-		runner.cmd.Wait()
+	runner := manager.runners[insDef.ID]
+	if runner == nil {
+		setInstanceState(insDef, constants.CRASHED)
+		panic(errors.New(fmt.Sprintf("instance %d is broken! please run audit", insDef.ID)))
 	}
-	if err := db.Db.Preload("Interfaces").First(insDef, insDef.ID).Error; err != nil {
-		return err
-	}
-	for _, insIf := range insDef.Interfaces {
-		if err := proxy.Delete(insIf.Port); err != nil {
-			return err
-		}
-	}
-	if err := interfaces.ReleaseIF(insDef); err != nil {
-		return err
-	}
-	setInstanceState(insDef, constants.TERMINATED)
-	return nil
+	runner.cancel()
+	return err
 }

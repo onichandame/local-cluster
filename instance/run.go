@@ -24,7 +24,10 @@ func Run(insDef *model.Instance) (err error) {
 	manager.lock.Lock()
 	defer func() { manager.lock.Unlock() }()
 	if insDef.ID == 0 {
-		panic(errors.New("instance must be created before run"))
+		insDef.Status = constants.CREATING
+		if err = db.Db.Create(insDef).Error; err != nil {
+			panic(err)
+		}
 	}
 	// if running do not run again
 	switch insDef.Status {
@@ -50,7 +53,7 @@ func Run(insDef *model.Instance) (err error) {
 			logrus.Error(err)
 			finalState = constants.CRASHED
 		}
-		if err := setInstanceState(insDef, finalState); err != nil {
+		if err = setInstanceState(insDef, finalState); err != nil {
 			panic(err)
 		}
 	}()
@@ -77,15 +80,15 @@ func Run(insDef *model.Instance) (err error) {
 	cmd.Dir = insDir
 	cmd.Env = append(cmd.Env, parseEnv(insDef)...)
 	// prepare interfaces
-	if err := interfaces.PrepareInterfaces(insDef); err != nil {
+	if err = interfaces.PrepareInterfaces(insDef); err != nil {
 		panic(err)
 	}
 	for _, insIf := range insDef.Interfaces {
 		var ifDef model.ApplicationInterface
-		if err := db.Db.First(&ifDef, insIf.DefinitionID).Error; err != nil {
+		if err = db.Db.First(&ifDef, insIf.DefinitionID).Error; err != nil {
 			logrus.Error(insIf.DefinitionID)
 			logrus.Error(err)
-			return err
+			panic(err)
 		}
 		if ifDef.PortByEnv != "" {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%d", ifDef.PortByEnv, insIf.Port))
@@ -95,12 +98,23 @@ func Run(insDef *model.Instance) (err error) {
 		}
 	}
 	if err = cmd.Start(); err != nil {
-		return err
+		panic(err)
 	}
 	if err = manager.run(insDef.ID, cmd, cancel); err != nil {
 		panic(err)
 	}
 	go func() {
+		defer func() {
+			var finalState constants.InstanceStatus
+			if err := recover(); err != nil {
+				finalState = constants.CRASHED
+			} else {
+				finalState = constants.TERMINATED
+			}
+			if err := setInstanceState(insDef, finalState); err != nil {
+				panic(err)
+			}
+		}()
 		runner := manager.runners[insDef.ID]
 		if runner == nil {
 			panic(fmt.Sprintf("failed to run instance %d", insDef.ID))
@@ -111,14 +125,19 @@ func Run(insDef *model.Instance) (err error) {
 			if err := db.Db.First(insDef, insDef.ID).Error; err != nil {
 				panic(err)
 			}
-			if insDef.Status != constants.TERMINATED {
-				if err := db.Db.Model(insDef).Update("status", constants.CRASHED).Error; err != nil {
+			if err := interfaces.Release(insDef); err != nil {
+				panic(err)
+			}
+			if insDef.Status != constants.TERMINATING {
+				if err == nil {
+					panic(errors.New("crashed"))
+				} else {
 					panic(err)
 				}
 			}
 		}
 	}()
-	return nil
+	return err
 }
 
 func parseEnv(insDef *model.Instance) []string {

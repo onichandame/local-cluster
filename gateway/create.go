@@ -9,7 +9,7 @@ import (
 )
 
 func Create(gwDef *model.Gateway) (err error) {
-	utils.RecoverFromError(&err)
+	defer utils.RecoverFromError(&err)
 	if gwDef.ID != 0 {
 		panic(errors.New("cannot re-create gateway"))
 	}

@@ -1,32 +1,23 @@
 package interfaces
 
 import (
-	"errors"
-
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
+	"github.com/onichandame/local-cluster/pkg/utils"
 )
 
-func ReleaseIF(svcDef interface{}) error {
-	svcIfs := make([]model.ServiceInterface, 0)
-	if insDef, ok := svcDef.(*model.Instance); ok {
-		if err := db.Db.Preload("Interfaces").Find(&insDef).Error; err != nil {
-			return err
-		}
-		svcIfs = insDef.Interfaces
-	} else if igDef, ok := svcDef.(*model.InstanceGroup); ok {
-		if err := db.Db.Preload("Interfaces").Find(&igDef).Error; err != nil {
-			return err
-		}
-		svcIfs = igDef.Interfaces
-	} else {
-		return errors.New("can only release interfaces for a valid service!")
+func Release(insDef *model.Instance) (err error) {
+	defer utils.RecoverFromError(&err)
+	if err := db.Db.Preload("Interfaces").Find(&insDef).Error; err != nil {
+		panic(err)
 	}
-
-	for _, svcIf := range svcIfs {
-		if err := deleteIF(&svcIf); err != nil {
-			return err
+	for _, insIf := range insDef.Interfaces {
+		if e := portAllocator.Deallocate(insIf.Port); e != nil {
+			err = e
 		}
 	}
-	return nil
+	if err != nil {
+		panic(err)
+	}
+	return err
 }
