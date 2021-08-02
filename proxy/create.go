@@ -17,10 +17,21 @@ func Create(srcPort uint, tgtPorts []uint) error {
 	p := proxy.New()
 	p.Source = fmt.Sprintf(":%d", srcPort)
 	for _, tgt := range tgtPorts {
-		p.Targets = append(p.Targets, fmt.Sprintf("localhost:%d", tgt))
+		p.Targets = append(p.Targets, parseTarget(tgt))
 	}
 	p.Strategy = proxy.ROUNDROBIN
 	err = p.Start()
 	proxyManager.proxies[srcPort] = p
 	return err
+}
+
+func HasPort(p *proxy.Proxy, port uint) bool {
+	proxyManager.lock.Lock()
+	defer proxyManager.lock.Unlock()
+	target := parseTarget(port)
+	return p.HasTarget(target)
+}
+
+func parseTarget(port uint) string {
+	return fmt.Sprintf("localhost:%d", port)
 }

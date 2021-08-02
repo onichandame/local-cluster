@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
 
 	"github.com/chebyrash/promise"
@@ -11,7 +12,7 @@ import (
 	"github.com/onichandame/local-cluster/pkg/utils"
 )
 
-func getServices(gwDef *model.Gateway) (err error, instances []*model.Instance) {
+func getServices(gwDef *model.Gateway) (instances []*model.Instance, err error) {
 	defer utils.RecoverFromError(&err)
 	ig := new(model.InstanceGroup)
 	ins := new(model.Instance)
@@ -42,7 +43,7 @@ func getServices(gwDef *model.Gateway) (err error, instances []*model.Instance) 
 	} else if ins != nil {
 		services.PushBack(ins)
 	} else {
-		panic(fmt.Sprintf("gateway %d has no services available", gwDef.ID))
+		panic(errors.New(fmt.Sprintf("gateway %d has no services available", gwDef.ID)))
 	}
 	serivce := services.Front()
 	for {
@@ -57,7 +58,7 @@ func getServices(gwDef *model.Gateway) (err error, instances []*model.Instance) 
 		serivce = serivce.Next()
 	}
 	if services.Len() < 1 {
-		panic(fmt.Sprintf("gateway %d does not have running service available"))
+		panic(errors.New(fmt.Sprintf("gateway %d does not have running service available", gwDef.ID)))
 	}
 	instances = make([]*model.Instance, 0)
 	service := services.Front()
@@ -70,5 +71,5 @@ func getServices(gwDef *model.Gateway) (err error, instances []*model.Instance) 
 		}
 		service = service.Next()
 	}
-	return err, instances
+	return instances, err
 }

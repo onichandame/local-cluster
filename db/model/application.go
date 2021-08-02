@@ -4,7 +4,7 @@ import "gorm.io/gorm"
 
 type Application struct {
 	gorm.Model
-	Name       string `gorm:"unique"`
+	Selectable
 	Specs      []ApplicationSpec
 	Interfaces []ApplicationInterface
 }

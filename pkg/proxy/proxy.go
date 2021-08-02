@@ -71,3 +71,14 @@ func (p *Proxy) nextTarget() string {
 	p.lastUsedTarget = target
 	return target
 }
+
+func (p *Proxy) HasTarget(target string) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	for _, t := range p.Targets {
+		if t == target {
+			return true
+		}
+	}
+	return false
+}
