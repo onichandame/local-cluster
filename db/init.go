@@ -39,19 +39,35 @@ func loadModels() error {
 	}
 	// order matters! do not shuffle randomly
 	models := []interface{}{
-		&model.User{},
-		&model.Credential{},
-		&model.JobRecord{},
-		&model.ApplicationSpec{},
-		&model.ApplicationInterface{},
+		&model.Application{},
+		&model.LocalApplication{},
+		&model.LocalApplicationSpec{},
+		&model.LocalApplicationInterface{},
+		&model.StaticApplication{},
+		&model.RemoteApplication{},
+		&model.RemoteApplicationInterface{},
 
+		&model.Storage{},
+
+		&model.InstanceProbe{},
+		&model.TCPProbe{},
+		&model.HTTPProbe{},
+		&model.StorageBinding{},
+
+		&model.Instance{},
 		&model.InstanceInterface{},
-		&model.Gateway{},
+
+		&model.InstanceGroup{},
+
+		&model.Credential{},
 
 		&model.Entrance{},
-		&model.Application{},
-		&model.Instance{},
-		&model.InstanceGroup{},
+
+		&model.Gateway{},
+
+		&model.JobRecord{},
+
+		&model.User{},
 	}
 	for _, m := range models {
 		loadAModel(m)

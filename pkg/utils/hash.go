@@ -15,28 +15,27 @@ const (
 	Sha256 HashAlgorithm = "sha256"
 )
 
-func CheckFileHash(filePath string, hashStr string) error {
+func CheckFileHash(filePath string, hashStr string) (err error) {
 	algorithm, hash, err := parseHashString(hashStr)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	if !isAlgorithmSupported(algorithm) {
-		return errors.New(fmt.Sprintf("hash algorithm %s not supported", algorithm))
+		panic(errors.New(fmt.Sprintf("hash algorithm %s not supported", algorithm)))
 	}
 	switch algorithm {
 	case Sha256:
 		if checksum, err := checksumFileSha256(filePath); err != nil {
-			return err
+			panic(err)
 		} else {
 			if checksum != hash {
-				return errors.New("checksum not correct")
-			} else {
-				return nil
+				panic(errors.New("checksum not correct"))
 			}
 		}
 	default:
-		return errors.New(fmt.Sprintf("hash algorithm %s not supported", algorithm))
+		panic(errors.New(fmt.Sprintf("hash algorithm %s not supported", algorithm)))
 	}
+	return err
 }
 
 func isAlgorithmSupported(algorithm HashAlgorithm) bool {
@@ -58,16 +57,17 @@ func parseHashString(hashStr string) (HashAlgorithm, string, error) {
 	}
 }
 
-func checksumFileSha256(filePath string) (string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", err
+func checksumFileSha256(filePath string) (hash string, err error) {
+	defer RecoverFromError(&err)
+	if file, err := os.Open(filePath); err != nil {
+		panic(err)
+	} else {
+		defer file.Close()
+		hasher := sha256.New()
+		if _, err := io.Copy(hasher, file); err != nil {
+			panic(err)
+		}
+		hash = string(hasher.Sum(nil))
 	}
-	defer file.Close()
-
-	hasher := sha256.New()
-	if _, err := io.Copy(hasher, file); err != nil {
-		return "", err
-	}
-	return string(hasher.Sum(nil)), nil
+	return hash, nil
 }

@@ -1,14 +1,22 @@
 package model
 
 import (
-	"github.com/onichandame/local-cluster/constants"
+	"github.com/onichandame/local-cluster/constants/instance"
 	"gorm.io/gorm"
 )
 
 type Instance struct {
 	gorm.Model
 	InstanceTemplate
-	Status          constants.InstanceStatus
+	Status          instance.InstanceStatus
 	InstanceGroupID uint
 	Interfaces      []InstanceInterface
+	Retries         uint
+}
+
+type InstanceInterface struct {
+	gorm.Model
+	Port           uint   `gorm:"not null"`
+	DefinitionName string `gorm:"not null"`
+	InstanceID     uint
 }

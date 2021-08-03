@@ -4,7 +4,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
+	"sync/atomic"
+	"unsafe"
 
 	"github.com/chebyrash/promise"
 	"github.com/google/uuid"
@@ -24,66 +27,67 @@ type CacheManager struct {
 }
 
 var manager *CacheManager
+var managerInited int32
 
-func InitCache() error {
-	if manager != nil {
-		return errors.New("cannot re-init cache manager")
+func getManager() *CacheManager {
+	if manager == nil {
+		manager = &CacheManager{}
+		atomic.CompareAndSwapPointer((*unsafe.Pointer)(unsafe.Pointer(&manager)), nil, unsafe.Pointer(&CacheManager{caches: make(map[uint]*promise.Promise)}))
 	}
-	manager = new(CacheManager)
-	manager.caches = make(map[uint]*promise.Promise)
-	return nil
+	return manager
 }
 
-func PrepareCache(appDef *model.Application) error {
-	cachePath := GetCachePath(appDef)
-	if err := GetSpec(appDef); err != nil {
-		return err
-	}
-	// only one routine can manipulate the map at a moment
-	manager.lock.Lock()
-	defer func() { manager.lock.Unlock() }()
-	// check if another process is caching or it is already cached
-	if utils.PathExists(cachePath) {
-		if appDef.Specs[0].Hash != "" {
-			if err := utils.CheckFileHash(cachePath, appDef.Specs[0].Hash); err != nil {
-				logrus.Infof("cache for app %d is broken! will delete it", appDef.ID)
-				if err := os.Remove(cachePath); err != nil {
-					return err
+func cache(id uint, url string, hash string) (err error) {
+	defer utils.RecoverFromError(&err)
+	cachePath := filepath.Join(config.Config.Path.Cache, strconv.Itoa(int(id)))
+	// only one routine can manipulate the manager at a moment
+	start := func() (p *promise.Promise) {
+		manager := getManager()
+		manager.lock.Lock()
+		defer manager.lock.Unlock()
+		// check if already cached
+		if utils.PathExists(cachePath) {
+			if hash != "" {
+				if err = utils.CheckFileHash(cachePath, hash); err != nil {
+					logrus.Infof("cache for app %d is broken! will delete it", id)
+					if err = os.RemoveAll(cachePath); err != nil {
+						panic(err)
+					} else {
+						cache(id, url, hash)
+					}
 				}
 			}
-		}
-		return nil
-	}
-	if _, ok := manager.caches[appDef.ID]; ok {
-		return nil
-	}
-	manager.caches[appDef.ID] = promise.New(func(resolve func(promise.Any), reject func(error)) {
-		logrus.Infof("downloading cache for app %s", appDef.Name)
-		tmpFilePath := newTmpFilePath()
-		if err := utils.Download(appDef.Specs[0].DownloadUrl, tmpFilePath); err != nil {
-			reject(err)
-		}
-		if appDef.Specs[0].Hash != "" {
-			if err := utils.CheckFileHash(tmpFilePath, appDef.Specs[0].Hash); err != nil {
-				reject(err)
+		} else {
+			if p, ok := manager.caches[id]; ok {
+				if _, err := p.Await(); err != nil {
+					panic(err)
+				}
 			}
+			p = promise.New(func(resolve func(promise.Any), reject func(error)) {
+				logrus.Infof("downloading cache for app %d", id)
+				tmpFilePath := newTmpFilePath()
+				if err := utils.Download(url, tmpFilePath); err != nil {
+					reject(err)
+				}
+				if hash != "" {
+					if err := utils.CheckFileHash(tmpFilePath, hash); err != nil {
+						reject(err)
+					}
+				}
+				logrus.Infof("downloaded cache for app %d", id)
+				delete(manager.caches, id)
+				if err := os.Rename(tmpFilePath, cachePath); err != nil {
+					reject(err)
+				}
+				resolve(nil)
+			})
+			manager.caches[id] = p
 		}
-		logrus.Infof("downloaded cache for app %s", appDef.Name)
-		delete(manager.caches, appDef.ID)
-		if err := os.Rename(tmpFilePath, cachePath); err != nil {
-			reject(err)
-		}
-		resolve(nil)
-	})
-	return nil
-}
-
-func WaitCache(appDef *model.Application) error {
-	if p, ok := manager.caches[appDef.ID]; ok {
-		_, err := p.Await()
-		return err
+		return p
 	}
-	return nil
+	p := start()
+	_, err = p.Await()
+	return err
 }
 
 func AuditCache() error {
