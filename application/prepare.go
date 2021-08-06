@@ -28,7 +28,7 @@ func Prepare(appDef *model.Application) (err error) {
 			panic(errors.New(fmt.Sprintf("application %d has conflicting definitions for the current system %s/%s. audit the specs then retry", appDef.ID, runtime.GOOS, runtime.GOARCH)))
 		}
 		spec := localApp.Specs[0]
-		if err = cache(appDef.ID, spec.DownloadUrl, spec.Hash); err != nil {
+		if err = Cache(appDef.ID, spec.DownloadUrl, spec.Hash); err != nil {
 			panic(err)
 		}
 	case application.STATIC:
@@ -36,7 +36,7 @@ func Prepare(appDef *model.Application) (err error) {
 		if err = db.Db.Where("application_id = ?", appDef.ID).First(&staticApp).Error; err != nil {
 			panic(err)
 		}
-		if err = cache(appDef.ID, staticApp.DownloadUrl, staticApp.Hash); err != nil {
+		if err = Cache(appDef.ID, staticApp.DownloadUrl, staticApp.Hash); err != nil {
 			panic(err)
 		}
 	}

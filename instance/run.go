@@ -9,7 +9,8 @@ import (
 	"strings"
 
 	"github.com/onichandame/local-cluster/application"
-	"github.com/onichandame/local-cluster/constants"
+	appConstants "github.com/onichandame/local-cluster/constants/application"
+	insConstants "github.com/onichandame/local-cluster/constants/instance"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/interfaces"
@@ -17,7 +18,39 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func Run(insDef *model.Instance) (err error) {
+func Run(instance *model.Instance) (err error) {
+	defer utils.RecoverFromError(&err)
+	if instance.ID == 0 {
+		panic(errors.New("cannot run instance before create!"))
+	}
+	var ins model.Instance
+	if err = db.Db.First(&ins, instance.ID).Error; err != nil {
+		panic(err)
+	}
+	switch ins.Status {
+	case insConstants.RUNNING, insConstants.TERMINATING, insConstants.TERMINATED, insConstants.RESTARTING:
+		panic(errors.New(fmt.Sprintf("cannot run instance in status %s", ins.Status)))
+	}
+	var app model.Application
+	if err = db.Db.Preload("LocalApplication").Preload("StaticApplication").Preload("RemoteApplication").First(&app, "name = ?", instance.ApplicationName).Error; err != nil {
+		panic(err)
+	}
+	if err = auditInsIfs(instance); err != nil {
+		panic(err)
+	}
+	switch app.Type {
+	case appConstants.LOCAL:
+		lrm := getLRM()
+		if err = lrm.run(&ins); err != nil {
+			panic(err)
+		}
+	case appConstants.STATIC:
+	case appConstants.REMOTE:
+	}
+	return err
+}
+
+func runLocal(insDef *model.Instance) (err error) {
 	defer utils.RecoverFromError(&err)
 	// Only one instance can be starting at a moment
 	manager := getRunnerManager()
@@ -137,6 +170,11 @@ func Run(insDef *model.Instance) (err error) {
 			}
 		}
 	}()
+	return err
+}
+
+func runStatic(staticIns *model.StaticApplication) (err error) {
+	defer utils.RecoverFromError(&err)
 	return err
 }
 

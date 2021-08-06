@@ -6,6 +6,7 @@ type config struct {
 		DB        string
 		Cache     string
 		Instances string
+		Storage   string
 	}
 	PortRange struct {
 		StartAt uint

@@ -53,6 +53,7 @@ func initPaths() error {
 	cacheKey := "cache"
 	dbKey := "db"
 	instancesKey := "instances"
+	storageKey := "storage"
 	exePath, err := os.Executable()
 	if err != nil {
 		return err
@@ -70,5 +71,8 @@ func initPaths() error {
 	viper.SetDefault(instancesKey, filepath.Join(defaultRoot, "instances"))
 	Config.Path.Instances = viper.GetString(instancesKey)
 	os.Mkdir(Config.Path.Instances, os.ModeDir)
+	viper.SetDefault(storageKey, filepath.Join(defaultRoot, "storages"))
+	Config.Path.Storage = viper.GetString(storageKey)
+	os.Mkdir(Config.Path.Storage, os.ModeDir)
 	return nil
 }

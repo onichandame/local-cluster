@@ -1,7 +1,6 @@
 package application
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,7 +11,6 @@ import (
 	"github.com/chebyrash/promise"
 	"github.com/google/uuid"
 	"github.com/onichandame/local-cluster/config"
-	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/pkg/utils"
 	"github.com/sirupsen/logrus"
 )
@@ -37,7 +35,7 @@ func getManager() *CacheManager {
 	return manager
 }
 
-func cache(id uint, url string, hash string) (err error) {
+func Cache(id uint, url string, hash string) (err error) {
 	defer utils.RecoverFromError(&err)
 	cachePath := filepath.Join(config.Config.Path.Cache, strconv.Itoa(int(id)))
 	// only one routine can manipulate the manager at a moment
@@ -53,7 +51,7 @@ func cache(id uint, url string, hash string) (err error) {
 					if err = os.RemoveAll(cachePath); err != nil {
 						panic(err)
 					} else {
-						cache(id, url, hash)
+						Cache(id, url, hash)
 					}
 				}
 			}
@@ -64,22 +62,30 @@ func cache(id uint, url string, hash string) (err error) {
 				}
 			}
 			p = promise.New(func(resolve func(promise.Any), reject func(error)) {
+				defer func() {
+					var err error
+					utils.RecoverFromError(&err)
+					if err == nil {
+						resolve(nil)
+					} else {
+						reject(err)
+					}
+				}()
 				logrus.Infof("downloading cache for app %d", id)
 				tmpFilePath := newTmpFilePath()
 				if err := utils.Download(url, tmpFilePath); err != nil {
-					reject(err)
+					panic(err)
 				}
 				if hash != "" {
 					if err := utils.CheckFileHash(tmpFilePath, hash); err != nil {
-						reject(err)
+						panic(err)
 					}
 				}
 				logrus.Infof("downloaded cache for app %d", id)
 				delete(manager.caches, id)
 				if err := os.Rename(tmpFilePath, cachePath); err != nil {
-					reject(err)
+					panic(err)
 				}
-				resolve(nil)
 			})
 			manager.caches[id] = p
 		}

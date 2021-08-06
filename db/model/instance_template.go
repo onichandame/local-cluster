@@ -7,8 +7,7 @@ import (
 
 type InstanceTemplate struct {
 	Selectable
-	ApplicationID   uint `gorm:"not null"`
-	Application     Application
+	ApplicationName uint `gorm:"not null"`
 	Probes          []InstanceProbe
 	MaxRetries      uint
 	Env             string

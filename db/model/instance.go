@@ -14,9 +14,12 @@ type Instance struct {
 	Retries         uint
 }
 
+// Instance creating/restarting → (create)
+// Instance crashed/terminating → (delete)
+
 type InstanceInterface struct {
 	gorm.Model
-	Port           uint   `gorm:"not null"`
-	DefinitionName string `gorm:"not null"`
-	InstanceID     uint
+	InstanceID     uint `gorm:"not null"`
+	Port           uint `gorm:"not null"`
+	DefinitionName string
 }
