@@ -20,6 +20,6 @@ type Instance struct {
 type InstanceInterface struct {
 	gorm.Model
 	InstanceID     uint `gorm:"not null"`
-	Port           uint `gorm:"not null"`
+	Port           uint `gorm:"not null,unique"`
 	DefinitionName string
 }

@@ -24,12 +24,20 @@ func prepareRuntime(instance *model.Instance) (err error) {
 		panic(err)
 	}
 	cachePath := filepath.Join(config.Config.Path.Cache, strconv.Itoa(int(app.ID)))
+	if utils.PathExists(insDir) {
+		if err = os.RemoveAll(insDir); err != nil {
+			panic(err)
+		}
+	}
 	if !utils.PathExists(insDir) {
 		if err = os.Mkdir(insDir, os.ModeDir); err != nil {
 			panic(err)
 		}
 	}
 	if err = utils.DecompressTarGZ(cachePath, insDir); err != nil {
+		panic(err)
+	}
+	if err = auditStorage(instance); err != nil {
 		panic(err)
 	}
 	return err

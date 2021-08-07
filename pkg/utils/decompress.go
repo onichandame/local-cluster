@@ -58,5 +58,10 @@ func createEntryFile(path string) (*os.File, error) {
 	if err := os.MkdirAll(filepath.Dir(path), os.ModeDir); err != nil {
 		return nil, err
 	}
+	if PathExists(path) {
+		if err := os.Remove(path); err != nil {
+			panic(err)
+		}
+	}
 	return os.Create(path)
 }

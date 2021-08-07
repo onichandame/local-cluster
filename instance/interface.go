@@ -8,12 +8,14 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"github.com/chebyrash/promise"
 	"github.com/onichandame/local-cluster/config"
 	appConstants "github.com/onichandame/local-cluster/constants/application"
 	insConstants "github.com/onichandame/local-cluster/constants/instance"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/pkg/utils"
+	"gorm.io/gorm"
 )
 
 type InterfaceManager struct {
@@ -163,6 +165,57 @@ func auditInsIfs(rawIns *model.Instance) (err error) {
 				panic(err)
 			}
 		}
+	}
+	return err
+}
+
+func auditOrphanIfs() (err error) {
+	defer utils.RecoverFromError(&err)
+	if rows, err := db.Db.Model(&model.InstanceInterface{}).Rows(); err != nil {
+		panic(err)
+	} else {
+		defer rows.Close()
+		proms := []*promise.Promise{}
+		for rows.Next() {
+			proms = append(proms, promise.New(func(resolve func(promise.Any), reject func(error)) {
+				defer utils.SettlePromise(resolve, reject)
+				var insIf model.InstanceInterface
+				if err = db.Db.ScanRows(rows, &insIf); err != nil {
+					panic(err)
+				}
+				if err = db.Db.First(&model.Instance{}, insIf.InstanceID).Error; err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						if err = db.Db.Delete(&insIf).Error; err != nil {
+							panic(err)
+						}
+					} else {
+						panic(err)
+					}
+				}
+			}))
+		}
+		if _, err = promise.AllSettled(proms...).Await(); err != nil {
+			panic(err)
+		}
+	}
+	return err
+}
+
+func auditActiveIfs() (err error) {
+	defer utils.RecoverFromError(&err)
+	m := getInterfaceManager()
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	proms := []*promise.Promise{}
+	for port := range m.ports {
+		if err = db.Db.First(&model.InstanceInterface{}, "port = ?", port).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				delete(m.ports, port)
+			}
+		}
+	}
+	if _, err = promise.AllSettled(proms...).Await(); err != nil {
+		panic(err)
 	}
 	return err
 }

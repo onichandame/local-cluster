@@ -11,20 +11,10 @@ import (
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/pkg/utils"
+	"gorm.io/gorm"
 )
 
 func validateStorage(storage *model.Storage) (err error) {
-	defer func() {
-		var validated bool
-		if err == nil {
-			validated = true
-		} else {
-			validated = false
-		}
-		if err := db.Db.Model(storage).Update("validated", validated).Error; err != nil {
-			panic(err)
-		}
-	}()
 	defer utils.RecoverFromError(&err)
 	truePath := filepath.Join(config.Config.Path.Storage, strconv.Itoa(int(storage.ID)))
 	if utils.PathExists(truePath) {
@@ -45,19 +35,6 @@ func validateStorage(storage *model.Storage) (err error) {
 
 func validatePath(path string) (err error) {
 	storage := new(model.Storage)
-	defer func() {
-		var validated bool
-		if err == nil {
-			validated = true
-		} else {
-			validated = false
-		}
-		if storage != nil {
-			if err := db.Db.Model(&storage).Update("validated", validated).Error; err != nil {
-				panic(err)
-			}
-		}
-	}()
 	defer utils.RecoverFromError(&err)
 	if fileInfo, err := os.Stat(path); err != nil {
 		panic(err)
@@ -70,7 +47,13 @@ func validatePath(path string) (err error) {
 				panic(err)
 			} else {
 				if err = db.Db.First(storage, uint(id)).Error; err != nil {
-					panic(err)
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						if err = os.RemoveAll(path); err != nil {
+							panic(err)
+						}
+					} else {
+						panic(err)
+					}
 				}
 			}
 		}

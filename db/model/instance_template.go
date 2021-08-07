@@ -41,10 +41,7 @@ type HTTPProbe struct {
 
 type StorageBinding struct {
 	gorm.Model
-	Selectable
-	StorageID  uint `gorm:"not null"`
-	Storage    Storage
-	InstanceID uint `gorm:"not null"`
-	Instance
-	Path string `gorm:"not null"`
+	StorageName uint   `gorm:"not null"`
+	InstanceID  uint   `gorm:"not null"`
+	Path        string `gorm:"not null"`
 }

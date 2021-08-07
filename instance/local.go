@@ -37,23 +37,10 @@ func (lrm *LocalRunnerManager) run(instance *model.Instance) (err error) {
 	default:
 		panic(errors.New(fmt.Sprintf("instance %d already running", instance.ID)))
 	}
-	lrm.lock.Lock()
-	defer lrm.lock.Unlock()
 	var ins model.Instance
 	if err = db.Db.Preload("Interfaces").First(&ins, instance.ID).Error; err != nil {
 		panic(err)
 	}
-	defer func() {
-		var finalState insConstants.InstanceStatus
-		if err == nil {
-			finalState = insConstants.RUNNING
-		} else {
-			finalState = insConstants.CRASHED
-		}
-		if err = db.Db.Model(&ins).Update("status", finalState).Error; err != nil {
-			panic(err)
-		}
-	}()
 	var app model.Application
 	if err = db.Db.Preload("LocalApplication.Specs", "platform = ? AND arch = ?", runtime.GOOS, runtime.GOARCH).Preload("LocalApplication.Interfaces").First(&app, "name = ?", instance.ApplicationName).Error; err != nil {
 		panic(err)
@@ -64,11 +51,7 @@ func (lrm *LocalRunnerManager) run(instance *model.Instance) (err error) {
 		panic(errors.New(fmt.Sprintf("application %d is broken!", app.ID)))
 	}
 	spec := app.LocalApplication.Specs[0]
-	if lrm.runners[ins.ID] != nil {
-		if err = db.Db.Model(&ins).Update("status", insConstants.RUNNING).Error; err != nil {
-			panic(err)
-		}
-	} else {
+	if lrm.runners[ins.ID] == nil {
 		if err = prepareRuntime(&ins); err != nil {
 			panic(err)
 		}
@@ -112,6 +95,22 @@ func (lrm *LocalRunnerManager) run(instance *model.Instance) (err error) {
 		if err = r.cmd.Start(); err != nil {
 			panic(err)
 		}
+		go func() {
+			r.cmd.Wait()
+			lrm.lock.Lock()
+			defer lrm.lock.Unlock()
+			delete(lrm.runners, ins.ID)
+		}()
+	} else {
+		panic(errors.New(fmt.Sprintf("instance %d already running!", ins.ID)))
+	}
+	return err
+}
+
+func (lrm *LocalRunnerManager) stop(id uint) (err error) {
+	defer utils.RecoverFromError(&err)
+	if runner, ok := lrm.runners[id]; ok {
+		runner.cancel()
 	}
 	return err
 }
