@@ -41,8 +41,12 @@ func (lrm *LocalRunnerManager) run(instance *model.Instance) (err error) {
 	if err = db.Db.Preload("Interfaces").First(&ins, instance.ID).Error; err != nil {
 		panic(err)
 	}
+	var template model.Template
+	if err = db.Db.First(&template, "name = ?", ins.TemplateName).Error; err != nil {
+		panic(err)
+	}
 	var app model.Application
-	if err = db.Db.Preload("LocalApplication.Specs", "platform = ? AND arch = ?", runtime.GOOS, runtime.GOARCH).Preload("LocalApplication.Interfaces").First(&app, "name = ?", instance.ApplicationName).Error; err != nil {
+	if err = db.Db.Preload("LocalApplication.Specs", "platform = ? AND arch = ?", runtime.GOOS, runtime.GOARCH).Preload("LocalApplication.Interfaces").First(&app, "name = ?", template.ApplicationName).Error; err != nil {
 		panic(err)
 	}
 	if len(app.LocalApplication.Specs) < 1 {
@@ -64,9 +68,9 @@ func (lrm *LocalRunnerManager) run(instance *model.Instance) (err error) {
 		}
 		cmd := exec.CommandContext(ctx, spec.Command, args...)
 		cmd.Dir = getInsRuntimeDir(ins.ID)
-		if ins.Env != "" {
+		if template.Env != "" {
 			envs := []string{}
-			if err = json.Unmarshal([]byte(ins.Env), &envs); err != nil {
+			if err = json.Unmarshal([]byte(template.Env), &envs); err != nil {
 				panic(err)
 			}
 			cmd.Env = append(cmd.Env, envs...)

@@ -1,18 +1,17 @@
 package model
 
 import (
-	"github.com/onichandame/local-cluster/constants"
+	jobConstants "github.com/onichandame/local-cluster/constants/job"
 	"gorm.io/gorm"
 )
 
 type JobRecord struct {
 	gorm.Model
-	Job      string `gorm:"index:linked_list,unique"`
-	StatusID uint
-	Status   constants.JobStatus
-	PrevID   uint `gorm:"index:linked_list,unique"`
-	Prev     *JobRecord
-	Output   string
-	RunByID  uint
-	RunBy    User
+	Job     string
+	Status  jobConstants.JobStatus
+	PrevID  uint `gorm:"unique"`
+	Prev    *JobRecord
+	Output  string
+	RunByID uint
+	RunBy   User
 }

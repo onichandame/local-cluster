@@ -49,7 +49,7 @@ func loadModels() error {
 
 		&model.Storage{},
 
-		&model.InstanceProbe{},
+		&model.Probe{},
 		&model.TCPProbe{},
 		&model.HTTPProbe{},
 		&model.StorageBinding{},

@@ -7,8 +7,9 @@ import (
 
 type InstanceGroup struct {
 	gorm.Model
-	Replicas uint
-	Status   instancegroup.InstanceGroupStatus
-	InstanceTemplate
-	Instances []Instance
+	Selectable
+	TemplateName string `gorm:"not null"`
+	Replicas     uint
+	Status       instancegroup.InstanceGroupStatus
+	Instances    []Instance
 }

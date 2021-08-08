@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 	"sync/atomic"
-	"unsafe"
 
 	"github.com/chebyrash/promise"
 	"github.com/onichandame/local-cluster/config"
@@ -15,63 +13,61 @@ import (
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/pkg/utils"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
-type InterfaceManager struct {
-	lock  sync.Mutex
-	ports map[uint]interface{}
-	last  uint
-}
+var last uint64
 
-func (m *InterfaceManager) nextAvailablePort() (port uint) {
+func nextAvailablePort() (port uint) {
 	maxTrials := config.Config.PortRange.EndAt - config.Config.PortRange.StartAt + 1
 	var trials uint
-	var getNextCandidate func(uint) uint
-	getNextCandidate = func(p uint) (r uint) {
+	var normalize func(uint) uint
+	normalize = func(p uint) uint {
 		if trials >= maxTrials {
 			panic(errors.New("no available ports left!"))
 		}
 		trials++
 		if p < config.Config.PortRange.StartAt || p > config.Config.PortRange.EndAt {
-			r = config.Config.PortRange.StartAt
+			p = config.Config.PortRange.StartAt
+		}
+		var insIf model.InstanceInterface
+		if err := db.Db.First(&insIf, "port = ?", p).Error; err == nil {
+			return normalize(p + 1)
 		} else {
-			if _, ok := m.ports[p]; ok {
-				return getNextCandidate(r + 1)
-			}
-			if tcpListener, err := net.Listen("tcp", fmt.Sprintf(":%d", r)); err != nil {
-				return getNextCandidate(r + 1)
-			} else {
-				defer tcpListener.Close()
-			}
-			if udpListener, err := net.Listen("udp", fmt.Sprintf(":%d", r)); err != nil {
-				return getNextCandidate(r + 1)
-			} else {
-				defer udpListener.Close()
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				panic(err)
 			}
 		}
-		return r
+		if tcpListener, err := net.Listen("tcp", fmt.Sprintf(":%d", p)); err != nil {
+			return normalize(p + 1)
+		} else {
+			defer tcpListener.Close()
+		}
+		if udpListener, err := net.Listen("udp", fmt.Sprintf(":%d", p)); err != nil {
+			return normalize(p + 1)
+		} else {
+			defer udpListener.Close()
+		}
+		return p
 	}
-	port = getNextCandidate(m.last)
+	port = normalize(uint(last) + 1)
 	return port
 }
 
-func (m *InterfaceManager) allocate() (port uint, err error) {
+func createIf(insIf *model.InstanceInterface) (err error) {
 	defer utils.RecoverFromError(&err)
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	port = m.nextAvailablePort()
-	m.last = port
-	return port, err
-}
-
-var ifMan *InterfaceManager
-
-func getInterfaceManager() *InterfaceManager {
-	if ifMan == nil {
-		atomic.CompareAndSwapPointer((*unsafe.Pointer)(unsafe.Pointer(&ifMan)), nil, unsafe.Pointer(&InterfaceManager{ports: make(map[uint]interface{})}))
+	oldLast := last
+	var f func()
+	f = func() {
+		insIf.Port = nextAvailablePort()
+		if err := db.Db.Create(insIf).Error; err != nil {
+			logrus.Warn(err)
+			f()
+		}
 	}
-	return ifMan
+	atomic.CompareAndSwapUint64(&last, oldLast, uint64(insIf.Port))
+	return err
 }
 
 func auditInsIfs(rawIns *model.Instance) (err error) {
@@ -80,14 +76,15 @@ func auditInsIfs(rawIns *model.Instance) (err error) {
 	if err = db.Db.Preload("Interfaces").First(&ins, rawIns.ID).Error; err != nil {
 		panic(err)
 	}
-	manager := getInterfaceManager()
-	manager.lock.Lock()
-	defer manager.lock.Unlock()
 	switch ins.Status {
 	// should have interfaces
 	case insConstants.CREATING, insConstants.RESTARTING, insConstants.RUNNING:
+		var template model.Template
+		if err = db.Db.First(&template, "name = ?", ins.TemplateName).Error; err != nil {
+			panic(err)
+		}
 		var app model.Application
-		if err = db.Db.Preload("LocalApplication.Interfaces").Preload("RemoteApplication.Interfaces").First(&app, "name = ?", ins.ApplicationName).Error; err != nil {
+		if err = db.Db.Preload("LocalApplication.Interfaces").Preload("RemoteApplication.Interfaces").First(&app, "name = ?", template.ApplicationName).Error; err != nil {
 			panic(err)
 		}
 		switch app.Type {
@@ -103,15 +100,8 @@ func auditInsIfs(rawIns *model.Instance) (err error) {
 					insIf = &model.InstanceInterface{}
 					insIf.InstanceID = ins.ID
 					insIf.DefinitionName = appIf.Name
-					if insIf.Port, err = manager.allocate(); err != nil {
+					if err = createIf(insIf); err != nil {
 						panic(err)
-					}
-					if err = db.Db.Create(insIf).Error; err != nil {
-						panic(err)
-					}
-				} else {
-					if _, ok := manager.ports[insIf.Port]; !ok {
-						manager.ports[insIf.Port] = nil
 					}
 				}
 			}
@@ -124,6 +114,7 @@ func auditInsIfs(rawIns *model.Instance) (err error) {
 				}
 				if appIf != nil {
 					if err = db.Db.Delete(&insIf).Error; err != nil {
+						panic(err)
 					}
 				}
 			}
@@ -131,10 +122,7 @@ func auditInsIfs(rawIns *model.Instance) (err error) {
 			if len(ins.Interfaces) < 1 {
 				var insIf model.InstanceInterface
 				insIf.InstanceID = ins.ID
-				if insIf.Port, err = manager.allocate(); err != nil {
-					panic(err)
-				}
-				if err = db.Db.Create(&insIf).Error; err != nil {
+				if err = createIf(&insIf); err != nil {
 					panic(err)
 				}
 			} else if len(ins.Interfaces) > 1 {
@@ -160,7 +148,6 @@ func auditInsIfs(rawIns *model.Instance) (err error) {
 		// should not have interfaces
 	case insConstants.TERMINATING, insConstants.TERMINATED, insConstants.CRASHED:
 		for _, insIf := range ins.Interfaces {
-			delete(manager.ports, insIf.Port)
 			if err = db.Db.Delete(&insIf).Error; err != nil {
 				panic(err)
 			}
@@ -197,25 +184,6 @@ func auditOrphanIfs() (err error) {
 		if _, err = promise.AllSettled(proms...).Await(); err != nil {
 			panic(err)
 		}
-	}
-	return err
-}
-
-func auditActiveIfs() (err error) {
-	defer utils.RecoverFromError(&err)
-	m := getInterfaceManager()
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	proms := []*promise.Promise{}
-	for port := range m.ports {
-		if err = db.Db.First(&model.InstanceInterface{}, "port = ?", port).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				delete(m.ports, port)
-			}
-		}
-	}
-	if _, err = promise.AllSettled(proms...).Await(); err != nil {
-		panic(err)
 	}
 	return err
 }

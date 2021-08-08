@@ -24,16 +24,23 @@ func Audit() (err error) {
 		defer rows.Close()
 		proms := []*promise.Promise{}
 		for rows.Next() {
+			var ins model.Instance
+			if err = db.Db.ScanRows(rows, &ins); err != nil {
+				panic(err)
+			}
 			proms = append(proms, promise.New(func(resolve func(promise.Any), reject func(error)) {
 				defer utils.SettlePromise(resolve, reject)
-				var ins model.Instance
-				if err = db.Db.ScanRows(rows, &ins); err != nil {
-					panic(err)
-				}
 				lock := getIL().getLock(ins.ID)
 				lock.Lock()
 				defer lock.Unlock()
 				if err = db.Db.First(&ins, ins.ID).Error; err != nil {
+					panic(err)
+				}
+				var template model.Template
+				if err = db.Db.First(&template, "name = ?", ins.TemplateName).Error; err != nil {
+					panic(err)
+				}
+				if err = auditStorage(&ins); err != nil {
 					panic(err)
 				}
 				if err = auditInsIfs(&ins); err != nil {
@@ -53,7 +60,7 @@ func Audit() (err error) {
 						panic(err)
 					}
 				case insConstants.CRASHED:
-					if ins.Retries < ins.MaxRetries {
+					if ins.Retries < template.MaxRetries {
 						if err = run(&ins); err != nil {
 							panic(err)
 						}

@@ -3,107 +3,74 @@ package job
 import (
 	"errors"
 	"fmt"
+	"time"
 
-	"github.com/onichandame/local-cluster/constants"
+	jobConstants "github.com/onichandame/local-cluster/constants/job"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
-	"github.com/sirupsen/logrus"
+	"github.com/onichandame/local-cluster/pkg/utils"
 	"gorm.io/gorm"
 )
 
 var errJobAlreadyRun = errors.New(fmt.Sprintf("job already created by another runner"))
 
-func runJob(j *job) error {
+func runJob(j *job) (err error) {
 	defer func() {
-		if err := recover(); err != nil {
-			logrus.Errorf("failed to run job %s", j.name)
-			panic(err)
+		if err != nil {
+			if j.fatal {
+				panic(err)
+			}
 		}
 	}()
+	defer utils.RecoverFromError(&err)
 	if j.totalRuns != 0 {
-		if runs, err := countRuns(struct {
-			job     string
-			success bool
-		}{job: j.name}); err != nil {
-			return errors.New(fmt.Sprintf("failed to count job records for job %s", j.name))
-		} else if runs >= j.totalRuns {
-			return errors.New(fmt.Sprintf("job %s has depleted all allowed runs", j.name))
+		var count int64
+		if err = db.Db.Model(&model.JobRecord{}).Where("job = ?", j.name).Count(&count).Error; err != nil {
+			panic(err)
+		}
+		if count >= int64(j.totalRuns) {
+			panic(errors.New(fmt.Sprintf("job %s has depleted all allowed runs", j.name)))
 		}
 	}
 	if j.successfulRuns != 0 {
-		if runs, err := countRuns(struct {
-			job     string
-			success bool
-		}{job: j.name, success: true}); err != nil {
-			return errors.New(fmt.Sprintf("failed to count successful runs for job %s", j.name))
-		} else if runs >= j.successfulRuns {
-			return errors.New(fmt.Sprintf("job %s has depleted all allowed successful runs", j.name))
+		var count int64
+		if err = db.Db.Model(&model.JobRecord{}).Where("job = ? AND status = ?", j.name, jobConstants.FINISHED).Count(&count).Error; err != nil {
+			panic(err)
+		}
+		if count >= int64(j.successfulRuns) {
+			panic(errors.New(fmt.Sprintf("job %s has depleted all allowed successful runs", j.name)))
 		}
 	}
-	prev := findLastRun(j)
-	run, err := initiateRun(j, prev)
-	if err != nil {
-		if !errors.Is(err, errJobAlreadyRun) {
-			if j.fatal {
-				return errors.New(fmt.Sprintf("job %s failed and it is fatal", j.name))
+	var prev model.JobRecord
+	if err = db.Db.Order("updated_at desc").First(&prev).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			panic(err)
+		}
+	}
+	if j.interval != 0 {
+		if time.Now().Sub(prev.UpdatedAt) < j.interval-time.Second {
+			panic(nil)
+		}
+	}
+	var record model.JobRecord
+	record.PrevID = prev.ID
+	record.Job = j.name
+	record.Status = jobConstants.PENDING
+	if err = db.Db.Create(&record).Error; err == nil {
+		if err = j.run(); err == nil {
+			record.Status = jobConstants.FINISHED
+		} else {
+			record.Status = jobConstants.FAILED
+			record.Output = err.Error()
+		}
+		if err = db.Db.Save(&record).Error; err != nil {
+			panic(err)
+		}
+		if j.fatal {
+			if record.Status != jobConstants.FINISHED {
+				panic(errors.New(record.Output))
 			}
 		}
 	}
-	if err = j.run(); err == nil {
-		return finalizeRun(run, constants.FINISHED)
-	} else {
-		logrus.Warnf("job %s failed", run.Job)
-		logrus.Warn(err)
-		finalizeRun(run, constants.FAILED)
-		if j.fatal {
-			panic(err)
-		} else {
-			return err
-		}
-	}
-}
-
-func findLastRun(job *job) uint {
-	prev := model.JobRecord{}
-	err := db.Db.Order("created_at desc").First(&prev).Error
-	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			logrus.Errorf("db error: failed to find job record!")
-			logrus.Fatal(err)
-		}
-	}
-	return prev.ID
-}
-
-func initiateRun(job *job, prev uint) (*model.JobRecord, error) {
-	run := model.JobRecord{Job: job.name, Status: constants.PENDING, PrevID: prev}
-	err := db.Db.Create(&run).Error
-	if err != nil {
-		logrus.Error(err)
-		err = db.Db.Where("prev_id = ?", "prev").First(&run).Error
-		if err == nil {
-			return nil, errors.New(fmt.Sprintf("failed to create new record for job %s", job.name))
-		} else {
-			return nil, errJobAlreadyRun
-		}
-	}
-	logrus.Infof("starting job %s", job.name)
-	return &run, nil
-}
-
-func finalizeRun(run *model.JobRecord, status constants.JobStatus) error {
-	return db.Db.Model(run).Where("status = ?", constants.PENDING).Update("status", status).Error
-}
-
-func countRuns(args struct {
-	job     string
-	success bool
-}) (uint, error) {
-	var count int64
-	query := db.Db.Model(&model.JobRecord{}).Where("job = ?", args.job)
-	if args.success {
-		query = query.Where("status = ?", constants.FINISHED)
-	}
-	err := query.Count(&count).Error
-	return uint(count), err
+	return err
 }

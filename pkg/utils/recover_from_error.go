@@ -5,5 +5,7 @@ func RecoverFromError(err *error) {
 		if e, ok := er.(error); ok {
 			*err = e
 		}
+	} else {
+		*err = nil
 	}
 }

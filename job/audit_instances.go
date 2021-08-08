@@ -1,12 +1,16 @@
 package job
 
-import "github.com/onichandame/local-cluster/instance"
+import (
+	"time"
+
+	"github.com/onichandame/local-cluster/instance"
+)
 
 var auditInstances = job{
 	name:      "AuditInstances",
 	immediate: true,
-	blocking:  true,
 	fatal:     true,
+	interval:  time.Minute,
 	run: func() error {
 		return instance.Audit()
 	},

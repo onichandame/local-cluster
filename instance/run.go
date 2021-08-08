@@ -27,7 +27,9 @@ func Run(instance *model.Instance) (err error) {
 func run(instance *model.Instance) (err error) {
 	defer utils.RecoverFromError(&err)
 	if instance.ID == 0 {
-		panic(errors.New("cannot run instance before create!"))
+		if err = db.Db.Create(instance).Error; err != nil {
+			panic(err)
+		}
 	}
 	var ins model.Instance
 	if err = db.Db.First(&ins, instance.ID).Error; err != nil {
@@ -52,8 +54,12 @@ func run(instance *model.Instance) (err error) {
 			panic(err)
 		}
 	}()
+	var template model.Template
+	if err = db.Db.First(&template, "name = ?", ins.TemplateName).Error; err != nil {
+		panic(err)
+	}
 	var app model.Application
-	if err = db.Db.Preload("LocalApplication").Preload("StaticApplication").Preload("RemoteApplication").First(&app, "name = ?", instance.ApplicationName).Error; err != nil {
+	if err = db.Db.Preload("LocalApplication").Preload("StaticApplication").Preload("RemoteApplication").First(&app, "name = ?", template.ApplicationName).Error; err != nil {
 		panic(err)
 	}
 	if err = auditInsIfs(instance); err != nil {
@@ -79,5 +85,7 @@ func run(instance *model.Instance) (err error) {
 	if err = db.Db.Model(&ins).Where("status = ?", ins.Status).Update("status", insConstants.RUNNING).Error; err != nil {
 		panic(err)
 	}
+	go func() {
+	}()
 	return err
 }

@@ -16,10 +16,14 @@ import (
 func auditStorage(instance *model.Instance) (err error) {
 	defer utils.RecoverFromError(&err)
 	var ins model.Instance
-	if err = db.Db.Preload("StorageBinding").First(&ins, instance.ID).Error; err != nil {
+	if err = db.Db.First(&ins, instance.ID).Error; err != nil {
 		panic(err)
 	}
-	for _, binding := range ins.StorageBindings {
+	var template model.Template
+	if err = db.Db.First(&template, "name = ?", ins.TemplateName).Error; err != nil {
+		panic(err)
+	}
+	for _, binding := range template.StorageBindings {
 		var storage model.Storage
 		if err = db.Db.First(&storage, "name = ?", binding.StorageName).Error; err != nil {
 			panic(err)

@@ -7,7 +7,8 @@ import (
 
 type Instance struct {
 	gorm.Model
-	InstanceTemplate
+	Selectable
+	TemplateName    string `gorm:"not null"`
 	Status          instance.InstanceStatus
 	InstanceGroupID uint
 	Interfaces      []InstanceInterface
