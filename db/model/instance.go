@@ -8,7 +8,7 @@ import (
 type Instance struct {
 	gorm.Model
 	Selectable
-	TemplateName    string `gorm:"not null"`
+	TemplateID      uint `gorm:"not null"`
 	Status          instance.InstanceStatus
 	InstanceGroupID uint
 	Interfaces      []InstanceInterface

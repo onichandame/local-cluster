@@ -7,13 +7,15 @@ import (
 
 type Template struct {
 	gorm.Model
-	Selectable
 
 	ApplicationName uint `gorm:"not null"`
 	Probes          []Probe
 	MaxRetries      uint
 	Env             string
 	StorageBindings []StorageBinding
+
+	Instances      []Instance
+	InstanceGroups []InstanceGroup
 }
 
 type Probe struct {

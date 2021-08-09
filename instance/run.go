@@ -44,7 +44,6 @@ func run(instance *model.Instance) (err error) {
 	default:
 		panic(errors.New(fmt.Sprintf("cannot run instance in status %s", ins.Status)))
 	}
-	return err
 	defer func() {
 		if err := recover(); err != nil {
 			if e := db.Db.Model(&ins).Where("status = ?", ins.Status).Update("status", insConstants.CRASHED).Error; e != nil {
@@ -55,7 +54,7 @@ func run(instance *model.Instance) (err error) {
 		}
 	}()
 	var template model.Template
-	if err = db.Db.First(&template, "name = ?", ins.TemplateName).Error; err != nil {
+	if err = db.Db.Preload("Probes.TCPProbe").Preload("Probes.HTTPProbe").First(&template, "name = ?", ins.TemplateName).Error; err != nil {
 		panic(err)
 	}
 	var app model.Application
@@ -86,6 +85,8 @@ func run(instance *model.Instance) (err error) {
 		panic(err)
 	}
 	go func() {
+		for _, probe := range template.Probes {
+		}
 	}()
 	return err
 }

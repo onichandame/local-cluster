@@ -19,8 +19,12 @@ func prepareRuntime(instance *model.Instance) (err error) {
 		logrus.Warnf("clearing old runtime for instance %d", instance.ID)
 		os.RemoveAll(insDir)
 	}
-	app := model.Application{}
-	if err = db.Db.First(&app, "name = ?", instance.ApplicationName).Error; err != nil {
+	var template model.Template
+	if err = db.Db.First(&template, "name = ?", instance.TemplateName).Error; err != nil {
+		panic(err)
+	}
+	var app model.Application
+	if err = db.Db.First(&app, "name = ?", template.ApplicationName).Error; err != nil {
 		panic(err)
 	}
 	cachePath := filepath.Join(config.Config.Path.Cache, strconv.Itoa(int(app.ID)))
