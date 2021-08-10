@@ -1,6 +1,8 @@
 package model
 
 import (
+	"time"
+
 	"github.com/onichandame/local-cluster/constants"
 	"gorm.io/gorm"
 )
@@ -20,16 +22,16 @@ type Template struct {
 
 type Probe struct {
 	gorm.Model
-	TemplateID   uint   `gorm:"not null"`
-	InitialDelay uint   `gorm:"not null"`
-	Period       string `gorm:"not null"`
-	TCPProbe     TCPProbe
-	HTTPProbe    HTTPProbe
+	TemplateID    uint          `gorm:"not null"`
+	InitialDelay  time.Duration `gorm:"not null"`
+	Period        time.Duration `gorm:"not null"`
+	InterfaceName string        `gorm:"not null"`
+	TCPProbe      *TCPProbe
+	HTTPProbe     *HTTPProbe
 }
 
 type probe struct {
-	InterfaceName string `gorm:"not null"`
-	ProbeID       uint   `gorm:"not null"`
+	ProbeID uint `gorm:"not null"`
 }
 
 type TCPProbe struct {
@@ -42,7 +44,7 @@ type HTTPProbe struct {
 	probe
 	Path   string               `gorm:"not null"`
 	Method constants.HTTPMethod `gorm:"not null"`
-	Status uint
+	Status int
 }
 
 type StorageBinding struct {

@@ -2,11 +2,12 @@ package template
 
 import (
 	"errors"
+	"sync"
 
-	"github.com/chebyrash/promise"
 	"github.com/onichandame/local-cluster/db"
 	"github.com/onichandame/local-cluster/db/model"
 	"github.com/onichandame/local-cluster/pkg/utils"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -16,53 +17,47 @@ func Audit() (err error) {
 		panic(err)
 	} else {
 		defer rows.Close()
-		proms := []*promise.Promise{}
+		wg := sync.WaitGroup{}
 		for rows.Next() {
+			wg.Add(1)
 			var template model.Template
-			if err = db.Db.ScanRows(rows, &template); err != nil {
+			if err = db.Db.Preload("Instances").Preload("InstanceGroups").ScanRows(rows, &template); err != nil {
 				panic(err)
 			}
-			proms = append(proms, promise.New(func(resolve func(promise.Any), reject func(error)) {
-				defer utils.SettlePromise(resolve, reject)
+			go func() {
+				defer wg.Done()
 				var err error
-				var ins *model.Instance
-				if err = db.Db.First(ins, "template_name = ?", template.Name).Error; err != nil {
-					if !errors.Is(err, gorm.ErrRecordNotFound) {
-						panic(err)
+				defer func() {
+					if err != nil {
+						logrus.Error(err)
 					}
-				}
-				var ig *model.InstanceGroup
-				if err = db.Db.First(ig, "template_name = ?", template.Name).Error; err != nil {
-					if !errors.Is(err, gorm.ErrRecordNotFound) {
-						panic(err)
-					}
-				}
-				if ins == nil && ig == nil {
+				}()
+				defer utils.RecoverFromError(&err)
+				if len(template.Instances) == 0 && len(template.InstanceGroups) == 0 {
 					if err = db.Db.Delete(&template).Error; err != nil {
 						panic(err)
 					}
 				}
-			}))
+			}()
 		}
-		if _, err = promise.AllSettled(proms...).Await(); err != nil {
+		wg.Wait()
+	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := auditStorageBindings(); err != nil {
 			panic(err)
 		}
-	}
-	if _, err = promise.AllSettled([]*promise.Promise{
-		promise.New(func(resolve func(promise.Any), reject func(error)) {
-			defer utils.SettlePromise(resolve, reject)
-			if err := auditStorageBindings(); err != nil {
-				panic(err)
-			}
-		}), promise.New(func(resolve func(promise.Any), reject func(error)) {
-			defer utils.SettlePromise(resolve, reject)
-			if err := auditProbes(); err != nil {
-				panic(err)
-			}
-		}),
-	}...).Await(); err != nil {
-		panic(err)
-	}
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := auditProbes(); err != nil {
+			panic(err)
+		}
+	}()
+	wg.Wait()
 	return err
 }
 
@@ -72,15 +67,22 @@ func auditStorageBindings() (err error) {
 		panic(err)
 	} else {
 		defer rows.Close()
-		proms := []*promise.Promise{}
+		wg := sync.WaitGroup{}
 		for rows.Next() {
 			var sb model.StorageBinding
 			if err = db.Db.ScanRows(rows, &sb); err != nil {
 				panic(err)
 			}
-			proms = append(proms, promise.New(func(resolve func(promise.Any), reject func(error)) {
-				defer utils.SettlePromise(resolve, reject)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
 				var err error
+				defer func() {
+					if err != nil {
+						logrus.Error(err)
+					}
+				}()
+				defer utils.RecoverFromError(&err)
 				if err = db.Db.First(&model.Template{}, sb.TemplateID).Error; err != nil {
 					if errors.Is(err, gorm.ErrRecordNotFound) {
 						if err = db.Db.Delete(&sb).Error; err != nil {
@@ -90,11 +92,9 @@ func auditStorageBindings() (err error) {
 						panic(err)
 					}
 				}
-			}))
+			}()
 		}
-		if _, err = promise.AllSettled(proms...).Await(); err != nil {
-			panic(err)
-		}
+		wg.Wait()
 	}
 	return err
 }
@@ -105,15 +105,22 @@ func auditProbes() (err error) {
 		panic(err)
 	} else {
 		defer rows.Close()
-		proms := []*promise.Promise{}
+		wg := sync.WaitGroup{}
 		for rows.Next() {
 			var probe model.Probe
 			if err = db.Db.ScanRows(rows, &probe); err != nil {
 				panic(err)
 			}
-			proms = append(proms, promise.New(func(resolve func(promise.Any), reject func(error)) {
-				defer utils.SettlePromise(resolve, reject)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
 				var err error
+				defer func() {
+					if err != nil {
+						logrus.Error(err)
+					}
+				}()
+				defer utils.RecoverFromError(&err)
 				if err = db.Db.First(&model.Template{}, probe.TemplateID).Error; err != nil {
 					if errors.Is(err, gorm.ErrRecordNotFound) {
 						if err = db.Db.Delete(&probe).Error; err != nil {
@@ -123,11 +130,9 @@ func auditProbes() (err error) {
 						db.Db.Where("probe_id = ?", probe.ID).Delete(&model.HTTPProbe{})
 					}
 				}
-			}))
+			}()
 		}
-		if promise.All(proms...).Await(); err != nil {
-			panic(err)
-		}
+		wg.Wait()
 	}
 	return err
 }

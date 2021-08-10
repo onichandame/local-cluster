@@ -9,6 +9,7 @@ type Instance struct {
 	gorm.Model
 	Selectable
 	TemplateID      uint `gorm:"not null"`
+	Template        *Template
 	Status          instance.InstanceStatus
 	InstanceGroupID uint
 	Interfaces      []InstanceInterface

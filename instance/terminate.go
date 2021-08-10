@@ -29,7 +29,7 @@ func terminate(instance *model.Instance) (err error) {
 	}
 	var ins model.Instance
 	defer utils.RecoverFromError(&err)
-	if err = db.Db.First(&ins, instance.ID).Error; err != nil {
+	if err = db.Db.Preload("Template").First(&ins, instance.ID).Error; err != nil {
 		panic(err)
 	}
 	switch ins.Status {
@@ -40,12 +40,8 @@ func terminate(instance *model.Instance) (err error) {
 	if err = db.Db.Model(&ins).Where("status = ?", ins.Status).Update("status", insConstants.TERMINATING).Error; err != nil {
 		panic(err)
 	}
-	var template model.Template
-	if err = db.Db.First(&template, "name = ?", ins.TemplateName).Error; err != nil {
-		panic(err)
-	}
 	var app model.Application
-	if err = db.Db.First(&app, "name = ?", template.ApplicationName).Error; err != nil {
+	if err = db.Db.First(&app, "name = ?", ins.Template.ApplicationName).Error; err != nil {
 		panic(err)
 	}
 	switch app.Type {

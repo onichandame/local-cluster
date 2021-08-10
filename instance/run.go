@@ -3,7 +3,13 @@ package instance
 import (
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
+	"sync"
+	"sync/atomic"
+	"time"
 
+	"github.com/onichandame/local-cluster/constants"
 	appConstants "github.com/onichandame/local-cluster/constants/application"
 	insConstants "github.com/onichandame/local-cluster/constants/instance"
 	"github.com/onichandame/local-cluster/db"
@@ -32,8 +38,11 @@ func run(instance *model.Instance) (err error) {
 		}
 	}
 	var ins model.Instance
-	if err = db.Db.First(&ins, instance.ID).Error; err != nil {
+	if err = db.Db.Preload("Template").First(&ins, instance.ID).Error; err != nil {
 		panic(err)
+	}
+	if ins.Template == nil {
+		panic(errors.New(fmt.Sprintf("instance %d has invalid template!", ins.ID)))
 	}
 	switch ins.Status {
 	case insConstants.CRASHED:
@@ -53,12 +62,8 @@ func run(instance *model.Instance) (err error) {
 			panic(err)
 		}
 	}()
-	var template model.Template
-	if err = db.Db.Preload("Probes.TCPProbe").Preload("Probes.HTTPProbe").First(&template, "name = ?", ins.TemplateName).Error; err != nil {
-		panic(err)
-	}
 	var app model.Application
-	if err = db.Db.Preload("LocalApplication").Preload("StaticApplication").Preload("RemoteApplication").First(&app, "name = ?", template.ApplicationName).Error; err != nil {
+	if err = db.Db.Preload("LocalApplication").Preload("StaticApplication").Preload("RemoteApplication").First(&app, "name = ?", ins.Template.ApplicationName).Error; err != nil {
 		panic(err)
 	}
 	if err = auditInsIfs(instance); err != nil {
@@ -84,8 +89,72 @@ func run(instance *model.Instance) (err error) {
 	if err = db.Db.Model(&ins).Where("status = ?", ins.Status).Update("status", insConstants.RUNNING).Error; err != nil {
 		panic(err)
 	}
+	// probes
 	go func() {
-		for _, probe := range template.Probes {
+		for _, probe := range ins.Template.Probes {
+			probe := probe
+			var insIf model.InstanceInterface
+			if err = db.Db.First(&insIf, "definition_name = ? AND instance_id =?", probe.InterfaceName, ins.ID).Error; err != nil {
+				panic(err)
+			}
+			var run func()
+			run = func() {
+				var running int32 = 1
+				var wg sync.WaitGroup
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					if probe.TCPProbe != nil {
+						if conn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", insIf.Port)); err != nil {
+							atomic.CompareAndSwapInt32(&running, 1, 0)
+						} else {
+							defer conn.Close()
+						}
+					}
+				}()
+				wg.Add(1)
+				go func() {
+					var err error
+					defer func() {
+						if err != nil {
+							atomic.CompareAndSwapInt32(&running, 1, 0)
+						}
+						wg.Done()
+					}()
+					defer utils.RecoverFromError(&err)
+					if probe.HTTPProbe != nil {
+						var res *http.Response
+						switch probe.HTTPProbe.Method {
+						case constants.GET:
+							if res, err = http.Get(fmt.Sprintf("http://localhost:%d%s", insIf.Port, probe.HTTPProbe.Path)); err != nil {
+								panic(err)
+							} else {
+								if probe.HTTPProbe.Status != 0 {
+									if res.StatusCode != probe.HTTPProbe.Status {
+										panic(errors.New(fmt.Sprintf("expect status %d but received %d", probe.HTTPProbe.Status, res.StatusCode)))
+									}
+								}
+							}
+						}
+					}
+				}()
+				wg.Wait()
+				var status insConstants.InstanceStatus
+				if running == 1 {
+					status = insConstants.RUNNING
+				} else {
+					status = insConstants.CRASHED
+				}
+				if err = db.Db.Model(&ins).Update("status", status).Error; err != nil {
+					panic(err)
+				}
+				time.Sleep(probe.Period)
+				run()
+			}
+			go func() {
+				time.Sleep(probe.InitialDelay)
+				run()
+			}()
 		}
 	}()
 	return err

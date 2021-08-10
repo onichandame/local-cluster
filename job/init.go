@@ -7,7 +7,14 @@ import (
 )
 
 func InitJobs() {
-	allJobs := []*job{&createAdmin, &runDashboard, &auditInstances, &initInterfaces, &initProxyManager}
+	allJobs := []*job{
+		&createAdmin,
+		&runDashboard,
+		&auditInstances,
+		&initInterfaces,
+		&initProxyManager,
+		&auditTemplates,
+	}
 
 	initJob := func(job *job) {
 		logrus.Infof("initializing job %s", job.name)

@@ -12,4 +12,5 @@ type Gateway struct {
 	Port          uint   `gorm:"not null"`
 	ServiceName   string `gorm:"not null"`
 	InterfaceName string `gorm:"not null"`
+	External      bool
 }

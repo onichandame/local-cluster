@@ -73,18 +73,14 @@ func createIf(insIf *model.InstanceInterface) (err error) {
 func auditInsIfs(rawIns *model.Instance) (err error) {
 	defer utils.RecoverFromError(&err)
 	var ins model.Instance
-	if err = db.Db.Preload("Interfaces").First(&ins, rawIns.ID).Error; err != nil {
+	if err = db.Db.Preload("Interfaces").Preload("Template").First(&ins, rawIns.ID).Error; err != nil {
 		panic(err)
 	}
 	switch ins.Status {
 	// should have interfaces
 	case insConstants.CREATING, insConstants.RESTARTING, insConstants.RUNNING:
-		var template model.Template
-		if err = db.Db.First(&template, "name = ?", ins.TemplateName).Error; err != nil {
-			panic(err)
-		}
 		var app model.Application
-		if err = db.Db.Preload("LocalApplication.Interfaces").Preload("RemoteApplication.Interfaces").First(&app, "name = ?", template.ApplicationName).Error; err != nil {
+		if err = db.Db.Preload("LocalApplication.Interfaces").Preload("RemoteApplication.Interfaces").First(&app, "name = ?", ins.Template.ApplicationName).Error; err != nil {
 			panic(err)
 		}
 		switch app.Type {
