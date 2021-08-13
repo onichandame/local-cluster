@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"sync/atomic"
 
-	"github.com/chebyrash/promise"
 	"github.com/onichandame/local-cluster/config"
 	appConstants "github.com/onichandame/local-cluster/constants/application"
 	insConstants "github.com/onichandame/local-cluster/constants/instance"
@@ -19,68 +19,70 @@ import (
 
 var last uint64
 
-func nextAvailablePort() (port uint) {
+func createIf(insIf *model.InstanceInterface) (err error) {
+	defer utils.RecoverFromError(&err)
+	oldLast := last
 	maxTrials := config.Config.PortRange.EndAt - config.Config.PortRange.StartAt + 1
 	var trials uint
-	var normalize func(uint) uint
-	normalize = func(p uint) uint {
+	var try func(uint)
+	try = func(p uint) {
+		tryNext := func() { try(p + 1) }
 		if trials >= maxTrials {
 			panic(errors.New("no available ports left!"))
 		}
 		trials++
-		if p < config.Config.PortRange.StartAt || p > config.Config.PortRange.EndAt {
-			p = config.Config.PortRange.StartAt
-		}
-		var insIf model.InstanceInterface
-		if err := db.Db.First(&insIf, "port = ?", p).Error; err == nil {
-			return normalize(p + 1)
-		} else {
-			if !errors.Is(err, gorm.ErrRecordNotFound) {
-				panic(err)
+		normalize := func() uint {
+			if p < config.Config.PortRange.StartAt || p > config.Config.PortRange.EndAt {
+				p = config.Config.PortRange.StartAt
 			}
+			var insIf model.InstanceInterface
+			if err := db.Db.First(&insIf, "port = ?", p).Error; err == nil {
+				return 0
+			} else {
+				if !errors.Is(err, gorm.ErrRecordNotFound) {
+					panic(err)
+				}
+			}
+			if tcpListener, err := net.Listen("tcp", fmt.Sprintf(":%d", p)); err != nil {
+				return 0
+			} else {
+				defer tcpListener.Close()
+			}
+			if udpListener, err := net.Listen("udp", fmt.Sprintf(":%d", p)); err != nil {
+				return 0
+			} else {
+				defer udpListener.Close()
+			}
+			return p
 		}
-		if tcpListener, err := net.Listen("tcp", fmt.Sprintf(":%d", p)); err != nil {
-			return normalize(p + 1)
-		} else {
-			defer tcpListener.Close()
+		port := normalize()
+		if port == 0 {
+			tryNext()
+			return
 		}
-		if udpListener, err := net.Listen("udp", fmt.Sprintf(":%d", p)); err != nil {
-			return normalize(p + 1)
-		} else {
-			defer udpListener.Close()
-		}
-		return p
-	}
-	port = normalize(uint(last) + 1)
-	return port
-}
-
-func createIf(insIf *model.InstanceInterface) (err error) {
-	defer utils.RecoverFromError(&err)
-	oldLast := last
-	var f func()
-	f = func() {
-		insIf.Port = nextAvailablePort()
+		insIf.Port = port
 		if err := db.Db.Create(insIf).Error; err != nil {
 			logrus.Warn(err)
-			f()
+			tryNext()
+			return
 		}
+		atomic.CompareAndSwapUint64(&last, oldLast, uint64(insIf.Port))
 	}
-	atomic.CompareAndSwapUint64(&last, oldLast, uint64(insIf.Port))
+	try(uint(last + 1))
 	return err
 }
 
 func auditInsIfs(rawIns *model.Instance) (err error) {
 	defer utils.RecoverFromError(&err)
 	var ins model.Instance
-	if err = db.Db.Preload("Interfaces").Preload("Template").First(&ins, rawIns.ID).Error; err != nil {
+	if err := db.Db.Preload("Interfaces").Preload("Template").First(&ins, rawIns.ID).Error; err != nil {
 		panic(err)
 	}
 	switch ins.Status {
 	// should have interfaces
-	case insConstants.CREATING, insConstants.RESTARTING, insConstants.RUNNING:
+	case insConstants.CREATING, insConstants.WAITING, insConstants.RESTARTING, insConstants.RUNNING:
 		var app model.Application
-		if err = db.Db.Preload("LocalApplication.Interfaces").Preload("RemoteApplication.Interfaces").First(&app, "name = ?", ins.Template.ApplicationName).Error; err != nil {
+		if err := db.Db.Preload("LocalApplication.Interfaces").Preload("RemoteApplication.Interfaces").First(&app, "name = ?", ins.Template.ApplicationName).Error; err != nil {
 			panic(err)
 		}
 		switch app.Type {
@@ -142,7 +144,7 @@ func auditInsIfs(rawIns *model.Instance) (err error) {
 			}
 		}
 		// should not have interfaces
-	case insConstants.TERMINATING, insConstants.TERMINATED, insConstants.CRASHED:
+	default:
 		for _, insIf := range ins.Interfaces {
 			if err = db.Db.Delete(&insIf).Error; err != nil {
 				panic(err)
@@ -158,15 +160,16 @@ func auditOrphanIfs() (err error) {
 		panic(err)
 	} else {
 		defer rows.Close()
-		proms := []*promise.Promise{}
+		var wg sync.WaitGroup
 		for rows.Next() {
-			proms = append(proms, promise.New(func(resolve func(promise.Any), reject func(error)) {
-				defer utils.SettlePromise(resolve, reject)
-				var insIf model.InstanceInterface
-				if err = db.Db.ScanRows(rows, &insIf); err != nil {
-					panic(err)
-				}
-				if err = db.Db.First(&model.Instance{}, insIf.InstanceID).Error; err != nil {
+			wg.Add(1)
+			var insIf model.InstanceInterface
+			if err := db.Db.ScanRows(rows, &insIf); err != nil {
+				panic(err)
+			}
+			go func() {
+				defer wg.Done()
+				if err := db.Db.First(&model.Instance{}, insIf.InstanceID).Error; err != nil {
 					if errors.Is(err, gorm.ErrRecordNotFound) {
 						if err = db.Db.Delete(&insIf).Error; err != nil {
 							panic(err)
@@ -175,11 +178,9 @@ func auditOrphanIfs() (err error) {
 						panic(err)
 					}
 				}
-			}))
+			}()
 		}
-		if _, err = promise.AllSettled(proms...).Await(); err != nil {
-			panic(err)
-		}
+		wg.Wait()
 	}
 	return err
 }

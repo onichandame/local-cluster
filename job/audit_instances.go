@@ -10,7 +10,7 @@ var auditInstances = job{
 	name:      "AuditInstances",
 	immediate: true,
 	fatal:     true,
-	interval:  time.Minute,
+	interval:  time.Minute * 5,
 	run: func() error {
 		return instance.Audit()
 	},

@@ -11,7 +11,7 @@ type Template struct {
 	gorm.Model
 
 	ApplicationName uint `gorm:"not null"`
-	Probes          []Probe
+	Probe           *Probe
 	MaxRetries      uint
 	Env             string
 	StorageBindings []StorageBinding
@@ -24,7 +24,7 @@ type Probe struct {
 	gorm.Model
 	TemplateID    uint          `gorm:"not null"`
 	InitialDelay  time.Duration `gorm:"not null"`
-	Period        time.Duration `gorm:"not null"`
+	Interval      time.Duration `gorm:"not null"`
 	InterfaceName string        `gorm:"not null"`
 	TCPProbe      *TCPProbe
 	HTTPProbe     *HTTPProbe
